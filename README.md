@@ -3,6 +3,8 @@
 **Which trading signals actually beat a coin flip?** A paper-trading research bot that runs every hour,
 for free, on GitHub Actions, and publishes a live dashboard on GitHub Pages. **Paper only: no keys, no real orders.**
 
+**Live dashboard:** https://navin346.github.io/signal-lab/
+
 ## What it does
 Every hour it reads prices, funding and open interest from Hyperliquid's public API for
 **Bitcoin, Ether, Solana, Gold, WTI crude and the Nasdaq-100**, plus headlines from Google News,

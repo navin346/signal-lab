@@ -34,6 +34,11 @@ jobs:
           if git fetch --depth 1 origin gh-pages 2>/dev/null; then
             git show FETCH_HEAD:data/state.json > docs/data/state.json 2>/dev/null || rm -f docs/data/state.json
           fi
+          # one-time migration: continue the history started in navin346/FundingrateArbitrage
+          if [ ! -s docs/data/state.json ]; then
+            curl -sf https://raw.githubusercontent.com/navin346/FundingrateArbitrage/gh-pages/data/state.json \
+              -o docs/data/state.json || rm -f docs/data/state.json
+          fi
           ls -la docs/data
       - name: run one tick
         run: python -m lab.main
