@@ -135,7 +135,12 @@
   </div>
 
   <div class="card">
-    <h2>Recent closed trades</h2>
+    <h2>Trade log: cross-check every trade</h2>
+    <p class="note">All times are <b>UTC</b>. Entries fill at Hyperliquid's mark price when the bot runs (plus 0.02% slippage);
+      stop-loss / take-profit exits fill at the stop or target price, stamped at the end of the hourly candle that touched it.
+      To verify, open the asset's 1-hour chart on Hyperliquid and check that the price was inside that hour's high/low.
+      <a id="csv-trades" href="data/trades.csv" download>Download all trades (CSV)</a> ·
+      <a id="csv-pos" href="data/positions.csv" download>Download open positions (CSV)</a></p>
     <div class="scroll"><table id="trades"></table></div>
   </div>
 
@@ -159,6 +164,9 @@ const $ = id => document.getElementById(id);
 const fmt = (x, d=2) => x == null ? "–" : Number(x).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d});
 const sgn = (x, d=2, suf="") => x == null ? "–" : (x > 0 ? "+" : "") + fmt(x, d) + suf;
 const when = ms => new Date(ms).toLocaleString(undefined,{month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
+const utc = ms => ms ? new Date(ms).toISOString().slice(0,16).replace("T"," ") + " UTC" : "–";
+const px = v => v == null ? "–" : fmt(v, v >= 1000 ? 1 : v >= 10 ? 3 : 4);
+function chartLink(d, a){ const m=(d.markets||{})[a]; const x=el("a", "chart"); if(m){ x.href="https://app.hyperliquid.xyz/trade/"+encodeURIComponent(m).replace("%3A",":"); x.target="_blank"; x.rel="noopener noreferrer"; } return x; }
 function el(tag, text, cls){ const e=document.createElement(tag); if(text!=null) e.textContent=text; if(cls) e.className=cls; return e; }
 function row(cells, head){ const tr=el("tr"); cells.forEach(c => { const td=el(head?"th":"td"); if(c instanceof Node) td.appendChild(c); else if (c && typeof c==="object") { td.textContent=c.t; if(c.c) td.className=c.c; } else td.textContent=c; tr.appendChild(td); }); return tr; }
 function fill(id, head, rows){ const t=$(id); t.replaceChildren(row(head,true)); rows.forEach(r => t.appendChild(row(r))); if(!rows.length) t.appendChild(row([{t:"nothing yet", c:"muted l"}])); }
@@ -221,11 +229,14 @@ function render(d){
       } else { td.append(el("span","learning","muted"), el("small","guess "+guess)); }
       tr.appendChild(td); }); mt.appendChild(tr); });
 
-  fill("positions", ["Strategy","Asset","Side","Entry","Now","Move","Stop","Target"],
+  fill("positions", ["Strategy","Asset","Side","Opened (UTC)","Entry","Now","Move","Stop","Target"],
     ORDER.flatMap(s => Object.entries(d.positions[s]||{}).map(([a,p]) => { const now=d.marks[a]; const mv=now? p.side*(now/p.entry-1)*100 : null;
-      return [NAMES[s], cfg.assets[a], side(p.side), fmt(p.entry, p.entry>1000?0:2), fmt(now, now>1000?0:2), pc(mv), fmt(p.stop, p.stop>1000?0:2), fmt(p.target, p.target>1000?0:2)]; })));
-  fill("trades", ["Closed","Strategy","Asset","Side","Move","P&L ($)","Why"],
-    d.trades.slice(0,60).map(t => [when(t.closed), NAMES[t.strategy], cfg.assets[t.asset]||t.asset, side(t.side==="long"?1:-1), pc(t.move_pct), {t: sgn(t.pnl,2), c: t.pnl>0?"pos":"neg"}, t.reason]));
+      return [NAMES[s], cfg.assets[a], side(p.side), utc(p.opened), px(p.entry), px(now), pc(mv), px(p.stop), px(p.target)]; })));
+  fill("trades", ["Strategy","Asset","Side","Opened (UTC)","Entry price","Closed (UTC)","Exit price","Move","P&L ($)","Why closed","Verify"],
+    d.trades.slice(0,150).map(t => [NAMES[t.strategy], cfg.assets[t.asset]||t.asset, side(t.side==="long"?1:-1), utc(t.opened), px(t.entry),
+      utc(t.closed), px(t.exit), pc(t.move_pct), {t: sgn(t.pnl,2), c: t.pnl>0?"pos":"neg"}, t.reason, chartLink(d, t.asset)]));
+  if (!location.hostname.endsWith("github.io")) {   // off GitHub Pages, CSVs live next to the raw data
+    const base = RAW.replace("summary.json", ""); $("csv-trades").href = base + "trades.csv"; $("csv-pos").href = base + "positions.csv"; }
   const ul=$("news"); ul.replaceChildren(...d.news.slice(0,25).map(n => { const li=el("li"); (n.themes||[]).forEach(t=>li.appendChild(el("span", t.replace(/_/g," "), "tag")));
     const a=el("a", n.title); if (/^https?:\/\//.test(n.link||"")) { a.href=n.link; a.target="_blank"; a.rel="noopener noreferrer"; } li.appendChild(a);
     li.appendChild(el("div", n.source + " · " + when(n.ts*1000), "muted")); return li; }));

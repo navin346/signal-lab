@@ -4,6 +4,8 @@
   python -m lab.main --decide   # force a fresh daily decision now (testing)
   python -m lab.main --reset    # wipe paper state and start over"""
 import argparse
+import csv
+import io
 import json
 import time
 from datetime import datetime, timezone
@@ -120,9 +122,40 @@ def tick(force_decide=False):
     return state
 
 
+def _p(x):
+    return f"{x:.6g}" if isinstance(x, (int, float)) else x
+
+
+def _utc(ms):
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if ms else ""
+
+
+def write_csv(state):
+    """Every trade with UTC timestamps and prices, for cross-checking on the exchange."""
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["strategy", "asset", "hyperliquid_market", "side", "opened_utc", "entry_price", "closed_utc",
+                "exit_price", "move_pct", "pnl_usd", "funding_usd", "reason"])
+    for t in state["trades"]:
+        w.writerow([t["strategy"], t["asset"], C.ASSETS[t["asset"]]["coin"], t["side"], _utc(t["opened"]), _p(t["entry"]),
+                    _utc(t["closed"]), _p(t["exit"]), t["move_pct"], t["pnl"], t["funding"], t["reason"]])
+    (OUT / "trades.csv").write_text(buf.getvalue())
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["strategy", "asset", "hyperliquid_market", "side", "opened_utc", "entry_price", "stop_price",
+                "target_price", "mark_now", "funding_usd_so_far"])
+    for s, acct in state["accounts"].items():
+        for a, p in acct["positions"].items():
+            w.writerow([s, a, C.ASSETS[a]["coin"], "long" if p["side"] > 0 else "short", _utc(p["opened"]),
+                        _p(p["entry"]), _p(p["stop"]), _p(p["target"]), _p(state.get("marks", {}).get(a)),
+                        round(p["funding"], 4)])
+    (OUT / "positions.csv").write_text(buf.getvalue())
+
+
 def write(state):
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "state.json").write_text(json.dumps(state, separators=(",", ":")))
+    write_csv(state)
     matrix = {th: {a: {k: v for k, v in c.items() if k in ("n", "mean_24h", "sd_24h", "hits")}
                    for a, c in cells.items()} for th, cells in state["matrix"].items()}
     summary = {
@@ -133,6 +166,7 @@ def write(state):
         "positions": {s: acct["positions"] for s, acct in state["accounts"].items()},
         "signals": state["last_signals"], "weights": state["weights"], "features": state["last_features"],
         "marks": state.get("marks", {}), "trades": state["trades"][-400:][::-1],
+        "markets": {a: v["coin"] for a, v in C.ASSETS.items()},
         "news": state["news_feed"][:80], "matrix": matrix,
         "priors": {th: v["prior"] for th, v in news.THEMES.items()},
         "events_logged": len(state["events"]), "errors": state["errors"],
