@@ -18,10 +18,22 @@ OUT = Path(__file__).resolve().parent.parent / "docs" / "data"
 HOUR = 3_600_000
 
 
+BACKUPS = OUT / "backups"
+KEEP_BACKUPS = 30          # one snapshot per day
+
+
 def load_state():
-    f = OUT / "state.json"
-    if f.exists():
-        return json.loads(f.read_text())
+    """Current state; if it is missing or corrupt, fall back to the newest good daily backup."""
+    candidates = [OUT / "state.json"] + sorted(BACKUPS.glob("state-*.json"), reverse=True)
+    for f in candidates:
+        try:
+            if f.exists():
+                st = json.loads(f.read_text())
+                if f.name != "state.json":
+                    print(f"state.json unreadable, restored from backup {f.name}")
+                return st
+        except (json.JSONDecodeError, OSError):
+            continue
     return {"created": int(time.time() * 1000), "last_tick": None, "last_decision": None,
             "accounts": {s: paper.new_account() for s in signals.DESCRIPTIONS},
             "trades": [], "curve": [], "events": [], "matrix": {}, "seen_news": [],
@@ -152,9 +164,21 @@ def write_csv(state):
     (OUT / "positions.csv").write_text(buf.getvalue())
 
 
+def _atomic(path, text):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)                    # never leaves a half-written file behind
+
+
 def write(state):
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "state.json").write_text(json.dumps(state, separators=(",", ":")))
+    blob = json.dumps(state, separators=(",", ":"))
+    _atomic(OUT / "state.json", blob)
+    BACKUPS.mkdir(exist_ok=True)
+    day = datetime.fromtimestamp(state["last_tick"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    _atomic(BACKUPS / f"state-{day}.json", blob)     # latest snapshot of each day
+    for old in sorted(BACKUPS.glob("state-*.json"))[:-KEEP_BACKUPS]:
+        old.unlink()
     write_csv(state)
     matrix = {th: {a: {k: v for k, v in c.items() if k in ("n", "mean_24h", "sd_24h", "hits")}
                    for a, c in cells.items()} for th, cells in state["matrix"].items()}

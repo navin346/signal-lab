@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  actions: write           # lets the run keep its own schedule enabled (see "keepalive")
 
 concurrency:
   group: tick
@@ -28,20 +29,27 @@ jobs:
       - run: pip install -r requirements.txt
       - name: tests
         run: python tests/test_core.py
-      - name: restore previous state from gh-pages
+      - name: restore previous data (state, daily backups) from gh-pages
         run: |
           mkdir -p docs/data
           if git fetch --depth 1 origin gh-pages 2>/dev/null; then
-            git show FETCH_HEAD:data/state.json > docs/data/state.json 2>/dev/null || rm -f docs/data/state.json
+            git archive FETCH_HEAD data 2>/dev/null | tar -x -C docs || true
           fi
-          # one-time migration: continue the history started in navin346/FundingrateArbitrage
-          if [ ! -s docs/data/state.json ]; then
-            curl -sf https://raw.githubusercontent.com/navin346/FundingrateArbitrage/gh-pages/data/state.json \
-              -o docs/data/state.json || rm -f docs/data/state.json
-          fi
-          ls -la docs/data
+          ls -la docs/data docs/data/backups 2>/dev/null || true
       - name: run one tick
         run: python -m lab.main
+      - name: sanity-check output before publishing
+        # if anything is wrong, the job fails here and gh-pages keeps the last good version
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          d = pathlib.Path("docs/data")
+          s = json.loads((d / "state.json").read_text())
+          assert s["accounts"] and s["last_tick"], "state looks empty"
+          json.loads((d / "summary.json").read_text())
+          print("state ok:", len(s["trades"]), "trades,", len(s["curve"]), "curve points,",
+                len(list((d / "backups").glob("*.json"))), "daily backups")
+          PY
       - name: publish dashboard + data
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -52,3 +60,14 @@ jobs:
           user_name: signal-lab-bot
           user_email: signal-lab-bot@users.noreply.github.com
           commit_message: "tick"
+      - name: off-site copy of the data (kept 30 days in Actions artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-${{ github.run_id }}
+          path: docs/data
+          retention-days: 30
+      - name: keepalive (GitHub pauses schedules after 60 days without repo activity)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/tick.yml/enable"
