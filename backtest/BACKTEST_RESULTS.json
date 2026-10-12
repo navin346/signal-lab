@@ -1,0 +1,440 @@
+{
+ "live": {
+  "ms_struct": {
+   "params": {
+    "use_choch": true,
+    "use_sfp": false,
+    "choch_bias": "daily",
+    "runner": false,
+    "min_rr": 2.0,
+    "atr_buf": 1.0,
+    "risk_pct": 1.0,
+    "max_open": 4
+   },
+   "train": {
+    "ret_pct": 45.63,
+    "max_dd_pct": -16.58,
+    "sharpe": 1.99,
+    "trades": 29,
+    "win_pct": 20.7,
+    "pf": 1.94,
+    "avg_r": 1.09,
+    "fees_funding": 5.68
+   },
+   "test": {
+    "ret_pct": 11.68,
+    "max_dd_pct": -18.14,
+    "sharpe": 0.83,
+    "trades": 55,
+    "win_pct": 25.5,
+    "pf": 1.34,
+    "avg_r": 0.34,
+    "fees_funding": 18.79
+   },
+   "full": {
+    "ret_pct": 63.45,
+    "max_dd_pct": -19.97,
+    "sharpe": 1.48,
+    "trades": 84,
+    "win_pct": 23.8,
+    "pf": 1.52,
+    "avg_r": 0.6,
+    "fees_funding": 24.46
+   },
+   "period": [
+    1762434000000,
+    1777098600000,
+    1791763200000
+   ]
+  },
+  "ta_trend": {
+   "params": {
+    "mode": "donchian",
+    "fast": 50,
+    "slow": 200,
+    "adx_min": 20.0,
+    "atr_mult": 2.0,
+    "risk_pct": 1.0
+   },
+   "train": {
+    "ret_pct": 11.96,
+    "max_dd_pct": -16.33,
+    "sharpe": 0.77,
+    "trades": 56,
+    "win_pct": 39.3,
+    "pf": 1.43,
+    "avg_r": 0.33,
+    "fees_funding": -0.07
+   },
+   "test": {
+    "ret_pct": 27.98,
+    "max_dd_pct": -19.34,
+    "sharpe": 1.3,
+    "trades": 122,
+    "win_pct": 32.8,
+    "pf": 1.4,
+    "avg_r": 0.31,
+    "fees_funding": -6.9
+   },
+   "full": {
+    "ret_pct": 43.28,
+    "max_dd_pct": -21.4,
+    "sharpe": 1.05,
+    "trades": 178,
+    "win_pct": 34.8,
+    "pf": 1.41,
+    "avg_r": 0.31,
+    "fees_funding": -6.96
+   },
+   "period": [
+    1762434000000,
+    1777098600000,
+    1791763200000
+   ]
+  },
+  "rel_value": {
+   "params": {
+    "mode": "momentum",
+    "lookback_d": 3,
+    "n_side": 5,
+    "hold_band": 3,
+    "gross_lev": 2.0
+   },
+   "train": {
+    "ret_pct": 29.72,
+    "max_dd_pct": -33.13,
+    "sharpe": 1.26,
+    "trades": 583,
+    "win_pct": 46.5,
+    "pf": 1.09,
+    "avg_r": 0.01,
+    "fees_funding": -7.06
+   },
+   "test": {
+    "ret_pct": 36.05,
+    "max_dd_pct": -36.48,
+    "sharpe": 1.31,
+    "trades": 587,
+    "win_pct": 44.6,
+    "pf": 1.06,
+    "avg_r": 0.01,
+    "fees_funding": -28.17
+   },
+   "full": {
+    "ret_pct": 77.04,
+    "max_dd_pct": -36.48,
+    "sharpe": 1.29,
+    "trades": 1170,
+    "win_pct": 45.6,
+    "pf": 1.07,
+    "avg_r": 0.01,
+    "fees_funding": -35.24
+   },
+   "period": [
+    1762430400000,
+    1777096800000,
+    1791763200000
+   ]
+  }
+ },
+ "reference": {
+  "ta_trend: 4H EMA 21/55 cross + ADX 20 (the original ask)": {
+   "params": {
+    "mode": "ema",
+    "fast": 21,
+    "slow": 55,
+    "adx_min": 20.0,
+    "atr_mult": 3.0
+   },
+   "train": {
+    "ret_pct": -33.72,
+    "max_dd_pct": -34.09,
+    "sharpe": -2.89,
+    "trades": 112,
+    "win_pct": 25.0,
+    "pf": 0.29,
+    "avg_r": -0.34,
+    "fees_funding": -2.53
+   },
+   "test": {
+    "ret_pct": 9.33,
+    "max_dd_pct": -23.82,
+    "sharpe": 0.65,
+    "trades": 136,
+    "win_pct": 36.0,
+    "pf": 1.15,
+    "avg_r": 0.12,
+    "fees_funding": -2.34
+   },
+   "full": {
+    "ret_pct": -27.53,
+    "max_dd_pct": -41.97,
+    "sharpe": -0.77,
+    "trades": 248,
+    "win_pct": 31.0,
+    "pf": 0.66,
+    "avg_r": -0.09,
+    "fees_funding": -4.87
+   },
+   "period": [
+    1762434000000,
+    1777098600000,
+    1791763200000
+   ]
+  },
+  "ta_trend: 4H EMA 9/21 cross, no filter": {
+   "params": {
+    "mode": "ema",
+    "fast": 9,
+    "slow": 21,
+    "adx_min": 0,
+    "atr_mult": 2.0
+   },
+   "train": {
+    "ret_pct": -10.07,
+    "max_dd_pct": -45.06,
+    "sharpe": 0.09,
+    "trades": 444,
+    "win_pct": 27.5,
+    "pf": 0.94,
+    "avg_r": 0.04,
+    "fees_funding": -9.18
+   },
+   "test": {
+    "ret_pct": 19.28,
+    "max_dd_pct": -34.54,
+    "sharpe": 0.84,
+    "trades": 515,
+    "win_pct": 30.9,
+    "pf": 1.09,
+    "avg_r": 0.13,
+    "fees_funding": -7.88
+   },
+   "full": {
+    "ret_pct": 6.68,
+    "max_dd_pct": -52.66,
+    "sharpe": 0.46,
+    "trades": 959,
+    "win_pct": 29.3,
+    "pf": 1.02,
+    "avg_r": 0.09,
+    "fees_funding": -17.06
+   },
+   "period": [
+    1762434000000,
+    1777098600000,
+    1791763200000
+   ]
+  },
+  "ms_struct: CHoCH + SFP, runner (first design)": {
+   "params": {},
+   "train": {
+    "ret_pct": 119.55,
+    "max_dd_pct": -42.79,
+    "sharpe": 1.98,
+    "trades": 470,
+    "win_pct": 44.7,
+    "pf": 1.16,
+    "avg_r": 0.56,
+    "fees_funding": 17.37
+   },
+   "test": {
+    "ret_pct": -33.88,
+    "max_dd_pct": -47.16,
+    "sharpe": -0.57,
+    "trades": 546,
+    "win_pct": 41.0,
+    "pf": 0.91,
+    "avg_r": 0.42,
+    "fees_funding": 8.53
+   },
+   "full": {
+    "ret_pct": 44.21,
+    "max_dd_pct": -60.54,
+    "sharpe": 0.89,
+    "trades": 1016,
+    "win_pct": 42.7,
+    "pf": 1.03,
+    "avg_r": 0.48,
+    "fees_funding": 25.91
+   },
+   "period": [
+    1762434000000,
+    1777098600000,
+    1791763200000
+   ]
+  },
+  "ms_struct: SFP only": {
+   "params": {
+    "use_choch": false,
+    "use_sfp": true,
+    "runner": false,
+    "min_rr": 2.0,
+    "risk_pct": 1.0,
+    "max_open": 4
+   },
+   "train": {
+    "ret_pct": 2.07,
+    "max_dd_pct": -38.27,
+    "sharpe": 0.43,
+    "trades": 208,
+    "win_pct": 21.2,
+    "pf": 0.99,
+    "avg_r": 0.11,
+    "fees_funding": 9.36
+   },
+   "test": {
+    "ret_pct": -57.98,
+    "max_dd_pct": -58.62,
+    "sharpe": -2.7,
+    "trades": 312,
+    "win_pct": 19.2,
+    "pf": 0.72,
+    "avg_r": -0.15,
+    "fees_funding": 10.98
+   },
+   "full": {
+    "ret_pct": -56.83,
+    "max_dd_pct": -72.73,
+    "sharpe": -0.98,
+    "trades": 520,
+    "win_pct": 20.0,
+    "pf": 0.86,
+    "avg_r": -0.04,
+    "fees_funding": 20.35
+   },
+   "period": [
+    1762434000000,
+    1777098600000,
+    1791763200000
+   ]
+  },
+  "rel_value: BTC-beta residual reversal 3d (first design)": {
+   "params": {
+    "mode": "residual",
+    "lookback_d": 3
+   },
+   "train": {
+    "ret_pct": -61.53,
+    "max_dd_pct": -62.17,
+    "sharpe": -2.96,
+    "trades": 596,
+    "win_pct": 51.0,
+    "pf": 0.74,
+    "avg_r": -0.01,
+    "fees_funding": 2.55
+   },
+   "test": {
+    "ret_pct": -55.7,
+    "max_dd_pct": -65.47,
+    "sharpe": -2.18,
+    "trades": 575,
+    "win_pct": 52.5,
+    "pf": 0.74,
+    "avg_r": -0.01,
+    "fees_funding": 3.29
+   },
+   "full": {
+    "ret_pct": -83.1,
+    "max_dd_pct": -86.82,
+    "sharpe": -2.56,
+    "trades": 1171,
+    "win_pct": 51.8,
+    "pf": 0.74,
+    "avg_r": -0.01,
+    "fees_funding": 5.84
+   },
+   "period": [
+    1762430400000,
+    1777096800000,
+    1791763200000
+   ]
+  },
+  "rel_value: funding carry 7d": {
+   "params": {
+    "mode": "carry",
+    "lookback_d": 7,
+    "n_side": 5,
+    "hold_band": 3
+   },
+   "train": {
+    "ret_pct": 30.59,
+    "max_dd_pct": -15.2,
+    "sharpe": 1.69,
+    "trades": 127,
+    "win_pct": 51.2,
+    "pf": 1.15,
+    "avg_r": 0.01,
+    "fees_funding": 38.26
+   },
+   "test": {
+    "ret_pct": -6.71,
+    "max_dd_pct": -17.91,
+    "sharpe": -0.06,
+    "trades": 135,
+    "win_pct": 54.8,
+    "pf": 1.0,
+    "avg_r": -0.0,
+    "fees_funding": 54.16
+   },
+   "full": {
+    "ret_pct": 21.57,
+    "max_dd_pct": -17.91,
+    "sharpe": 0.69,
+    "trades": 262,
+    "win_pct": 53.1,
+    "pf": 1.06,
+    "avg_r": 0.0,
+    "fees_funding": 92.42
+   },
+   "period": [
+    1762430400000,
+    1777096800000,
+    1791763200000
+   ]
+  },
+  "rel_value: momentum 7d": {
+   "params": {
+    "mode": "momentum",
+    "lookback_d": 7,
+    "n_side": 5,
+    "hold_band": 3
+   },
+   "train": {
+    "ret_pct": 40.99,
+    "max_dd_pct": -22.56,
+    "sharpe": 1.62,
+    "trades": 323,
+    "win_pct": 44.3,
+    "pf": 1.16,
+    "avg_r": 0.02,
+    "fees_funding": -5.66
+   },
+   "test": {
+    "ret_pct": 60.09,
+    "max_dd_pct": -22.22,
+    "sharpe": 1.94,
+    "trades": 325,
+    "win_pct": 43.4,
+    "pf": 1.17,
+    "avg_r": 0.02,
+    "fees_funding": -32.96
+   },
+   "full": {
+    "ret_pct": 127.04,
+    "max_dd_pct": -22.56,
+    "sharpe": 1.8,
+    "trades": 648,
+    "win_pct": 43.8,
+    "pf": 1.16,
+    "avg_r": 0.02,
+    "fees_funding": -38.62
+   },
+   "period": [
+    1762430400000,
+    1777096800000,
+    1791763200000
+   ]
+  }
+ }
+}

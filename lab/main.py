@@ -1,25 +1,63 @@
-"""One run = one hourly tick. GitHub Actions calls this every hour and commits docs/data.
+"""One run = one tick. GitHub Actions calls this hourly (in practice every 1-8h, GitHub's
+scheduler is often late) and publishes docs/data to GitHub Pages.
+
+Each tick replays every hourly candle since the previous tick through the research bots
+(lab/engine.py), so a late runner never changes a decision or a fill price.
 
   python -m lab.main            # normal tick
-  python -m lab.main --decide   # force a fresh daily decision now (testing)
   python -m lab.main --reset    # wipe paper state and start over"""
 import argparse
 import csv
 import io
 import json
+import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lab import analyst, engine, learn, market, news, paper, signals, universe
 from lab import config as C
-from lab import learn, market, news, paper, signals
+from lab import strategies as S
 
 OUT = Path(__file__).resolve().parent.parent / "docs" / "data"
-HOUR = 3_600_000
-
-
 BACKUPS = OUT / "backups"
 KEEP_BACKUPS = 30          # one snapshot per day
+HOUR = 3_600_000
+MAX_REPLAY_H = 72          # never replay more than 3 days (e.g. after a long outage)
+CONTROLS = ["coin_flip", "buy_hold"]
+RETIRED = ["momentum_3d", "momentum_7d", "crowd_follow", "crowd_fade", "news", "combo"]
+LEGACY = {"BTC": "BTC", "ETH": "ETH", "SOL": "SOL", "GOLD": "xyz:GOLD", "OIL": "xyz:CL", "NASDAQ": "xyz:XYZ100"}
+
+# Picked from the 12-month backtest (see BACKTEST.md for how, and for what failed).
+PARAMS = {
+    "ms_struct": dict(use_choch=True, use_sfp=False, choch_bias="daily", runner=False, min_rr=2.0, atr_buf=1.0,
+                      risk_pct=1.0, max_open=4),
+    "ta_trend": dict(mode="donchian", fast=50, slow=200, adx_min=20.0, atr_mult=2.0, risk_pct=1.0),
+    "news_regime": dict(),
+    "rel_value": dict(mode="momentum", lookback_d=3, n_side=5, hold_band=3, gross_lev=2.0),
+}
+
+
+def build(top30, held_rv):
+    rv_coins = list(dict.fromkeys(top30 + held_rv))
+    return [S.MarketStructure(universe.DIRECTIONAL, **PARAMS["ms_struct"]),
+            S.RelativeValue(rv_coins, **PARAMS["rel_value"]),
+            S.NewsRegime(universe.DIRECTIONAL, **PARAMS["news_regime"]),
+            S.TATrend(universe.DIRECTIONAL, **PARAMS["ta_trend"])]
+
+
+BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]
+DESCRIPTIONS = {
+    "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
+    "news_regime": S.NewsRegime.description, "ta_trend": S.TATrend.description,
+    "coin_flip": signals.DESCRIPTIONS["coin_flip"], "buy_hold": signals.DESCRIPTIONS["buy_hold"],
+}
+
+
+def fresh_state():
+    return {"created": int(time.time() * 1000), "last_tick": None, "last_decision": None,
+            "accounts": {}, "trades": [], "curve": [], "events": [], "matrix": {}, "seen_news": [],
+            "last_signals": {}, "news_feed": [], "errors": {}}
 
 
 def load_state():
@@ -34,15 +72,41 @@ def load_state():
                 return st
         except (json.JSONDecodeError, OSError):
             continue
-    return {"created": int(time.time() * 1000), "last_tick": None, "last_decision": None,
-            "accounts": {s: paper.new_account() for s in signals.DESCRIPTIONS},
-            "trades": [], "curve": [], "events": [], "matrix": {}, "seen_news": [],
-            "last_signals": {}, "last_features": {}, "weights": {}, "news_feed": [], "errors": {}}
+    return fresh_state()
+
+
+def migrate(state, marks_legacy, now):
+    """v1 -> v2: retire the naive v1 bots (close their positions, keep their history), add the
+    four research bots with fresh $500 accounts, keep the two controls running."""
+    if state.get("version") == 2:
+        return
+    retired = {}
+    for s in RETIRED + CONTROLS:              # controls restart too, so every bot starts level
+        acct = state["accounts"].pop(s, None)
+        if not acct:
+            continue
+        for a in list(acct["positions"]):
+            if a in marks_legacy:
+                paper.close(acct, a, marks_legacy[a], now, "bot retired", state["trades"], s)
+        name = s + "_v1" if s in CONTROLS else s
+        retired[name] = {"equity": round(paper.equity(acct, marks_legacy), 2), "retired_at": now,
+                         "trades": sum(1 for t in state["trades"] if t["strategy"] == s),
+                         "description": signals.DESCRIPTIONS[s]}
+    for t in state["trades"]:
+        if t["strategy"] in CONTROLS:
+            t["strategy"] += "_v1"
+    for s in CONTROLS:
+        state["accounts"][s] = paper.new_account()
+    for s in BOTS:
+        state["accounts"][s] = engine.new_account(C.START_EQUITY)
+    state["last_decision"] = None                  # controls re-enter right away
+    state.update({"version": 2, "retired": retired, "v2_started": now, "engine_T": now // HOUR * HOUR,
+                  "news_items": [], "top30": None, "top30_src": None, "top30_day": None})
 
 
 def stats(state):
     out = {}
-    for s, acct in state["accounts"].items():
+    for s in BOTS + CONTROLS:
         tr = [t for t in state["trades"] if t["strategy"] == s]
         curve = [p["eq"][s] for p in state["curve"] if s in p["eq"]]
         peak, dd = C.START_EQUITY, 0.0
@@ -50,33 +114,56 @@ def stats(state):
             peak = max(peak, e)
             dd = min(dd, e / peak - 1)
         eq = curve[-1] if curve else C.START_EQUITY
+        acct = state["accounts"][s]
         out[s] = {"equity": round(eq, 2), "return_pct": round((eq / C.START_EQUITY - 1) * 100, 2),
                   "trades": len(tr), "win_pct": round(sum(t["pnl"] > 0 for t in tr) / len(tr) * 100, 1) if tr else None,
                   "avg_pnl": round(sum(t["pnl"] for t in tr) / len(tr), 3) if tr else None,
                   "max_dd_pct": round(dd * 100, 2), "open": len(acct["positions"]),
-                  "description": signals.DESCRIPTIONS[s]}
+                  "control": s in CONTROLS, "description": DESCRIPTIONS[s]}
     return out
 
 
-def tick(force_decide=False):
+def fetch(coins_1h, coins_4h, errors):
+    data = {}
+    for c in coins_1h:
+        try:
+            data[c] = market.candles(c, 24 * 200, "1h")
+        except Exception as e:
+            errors[f"candles:{c}"] = str(e)[:120]
+    for c in coins_4h:
+        if c in data:
+            continue
+        try:
+            data[c] = market.candles(c, 6 * 45, "4h", pause=0.3)
+        except Exception as e:
+            errors[f"candles:{c}"] = str(e)[:120]
+    return {c: v for c, v in data.items() if len(v) > 30}
+
+
+def tick():
     now = int(time.time() * 1000)
     state = load_state()
     errors = {}
-    coins = {v["coin"]: k for k, v in C.ASSETS.items()}
+    ctx = market.contexts()
+    marks = {c: v["mark"] for c, v in ctx.items()}
+    funding = {c: v["funding"] for c, v in ctx.items()}
+    marks_legacy = {a: marks[c] for a, c in LEGACY.items() if c in marks}
+    migrate(state, marks_legacy, now)
 
-    ctx = market.contexts(set(coins))
-    marks = {coins[c]: v["mark"] for c, v in ctx.items()}
-    funding = {coins[c]: v["funding"] for c, v in ctx.items()}
-    bars, fund_hist = {}, {}
-    for a, cfg in C.ASSETS.items():
-        try:
-            bars[a] = market.candles(cfg["coin"], 24 * 8 + 2)
-            fund_hist[a] = market.funding_history(cfg["coin"], 30)
-        except Exception as e:
-            errors[f"market:{a}"] = str(e)[:120]
-            bars[a], fund_hist[a] = [], []
+    # ---- universe for relative value: top 30 by market cap that trade on Hyperliquid (daily)
+    day = datetime.fromtimestamp(now / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    if state.get("top30_day") != day:
+        lst, src = universe.top30(set(ctx))
+        if lst:
+            state["top30"], state["top30_src"], state["top30_day"] = lst, src, day
+        else:
+            errors["universe"] = "market-cap sources unavailable, kept previous list"
+    top30 = state.get("top30") or universe.FALLBACK_TOP30
+    held_rv = list(state["accounts"]["rel_value"]["positions"])
 
-    # ---- news: new headlines -> themes -> event log; fill in reactions of older events
+    data = fetch(universe.DIRECTIONAL, top30 + held_rv, errors)
+
+    # ---- news: fetch -> AI analyst (or keyword fallback) -> items; keep learning the keyword matrix
     try:
         items, nerr = news.fetch_headlines()
         errors.update({f"news:{k}": v for k, v in nerr.items()})
@@ -89,78 +176,136 @@ def tick(force_decide=False):
         it["themes"] = news.tag(it["title"])
         if it["themes"]:
             themed.append(it)
-    learn.log_events(state, themed, marks, now)
-    learn.fill_returns(state, bars, now)
+    bars_legacy = {a: data[c][-24 * 9:] for a, c in LEGACY.items() if c in data}
+    learn.log_events(state, themed, marks_legacy, now)
+    learn.fill_returns(state, bars_legacy, now)
     state["seen_news"] = (state["seen_news"] + [it["id"] for it in fresh])[-6000:]
     state["news_feed"] = (sorted(themed, key=lambda x: -x["ts"]) + state["news_feed"])[:150]
+    analysed, status = analyst.analyse(fresh, state["matrix"])
+    state["news_items"] = sorted(state.get("news_items", []) + analysed, key=lambda x: -x["ts"])
+    state["news_items"] = [x for x in state["news_items"] if now / 1000 - x["ts"] < 4 * 86400][:400]
+    state["analyst_status"] = status
+    nitems = state["news_items"]
 
-    # ---- risk: stops / targets on the hourly path, then funding since the last tick
-    last = state["last_tick"] or now
-    hours = max(0.0, (now - last) / HOUR)
-    for s, acct in state["accounts"].items():
+    # ---- research bots: replay every closed hour since the last tick
+    t_to = now // HOUR * HOUR
+    t_from = max(state.get("engine_T") or t_to, t_to - MAX_REPLAY_H * HOUR)
+    bots = build(top30, held_rv)
+    for b in bots:
+        b.prepare(data)
+    accts = {s: state["accounts"][s] for s in BOTS}
+    fund_fn = {c: funding.get(c, 0.0) for c in data}
+    engine.run(bots, accts, data, fund_fn, t_from, t_to, state["trades"],
+               ctx={"news": lambda coin, T: analyst.view(nitems, coin, T)}, booked=now)
+    state["engine_T"] = t_to
+
+    # ---- controls (unchanged from v1): daily coin flip / always long on the six v1 markets
+    for s in CONTROLS:
+        acct = state["accounts"][s]
         for a in list(acct["positions"]):
-            since = [b for b in bars.get(a, []) if b["t"] + HOUR > last]
+            since = [b for b in bars_legacy.get(a, []) if b["t"] + HOUR > (state["last_tick"] or now)]
             paper.check_stops(acct, a, since, state["trades"], s)
-            if a in acct["positions"] and a in marks:
-                paper.accrue_funding(acct, a, funding.get(a, 0.0), hours, marks[a])
-
-    # ---- daily decision
+            if a in acct["positions"] and a in marks_legacy:
+                hours = max(0.0, (now - (state["last_tick"] or now)) / HOUR)
+                paper.accrue_funding(acct, a, funding.get(LEGACY[a], 0.0), hours, marks_legacy[a])
     dt = datetime.fromtimestamp(now / 1000, tz=timezone.utc)
     day_key = dt.strftime("%Y-%m-%d") if dt.hour >= C.DECISION_HOUR_UTC else None
-    recent = [e for e in state["events"] if now - e["seen"] <= C.NEWS_LOOKBACK_H * HOUR]
-    nscore = signals.news_scores(recent, state["matrix"])
-    feat = {a: signals.features(a, bars.get(a, []), fund_hist.get(a, []), nscore) for a in C.ASSETS}
-    if force_decide or (day_key and day_key != state["last_decision"]):
-        weights = signals.learn_weights(state["trades"])
-        decision = signals.decide(feat, weights, day_key or dt.strftime("%Y-%m-%d"))
-        for s, targets in decision.items():
-            paper.rebalance(state["accounts"][s], targets, marks, now, state["trades"], s)
+    if day_key and day_key != state["last_decision"]:
+        rnd = random.Random(day_key)                       # reproducible coin flips per day
+        decision = {"coin_flip": {a: rnd.choice([-1, 1]) for a in C.ASSETS}, "buy_hold": {a: 1 for a in C.ASSETS}}
+        for s in CONTROLS:
+            paper.rebalance(state["accounts"][s], decision[s], marks_legacy, now, state["trades"], s)
         state["last_decision"] = day_key
         state["last_signals"] = decision
-        state["weights"] = weights
-        state["decided_at"] = now
-    state["last_features"] = {a: {k: (round(v, 3) if isinstance(v, float) else v) for k, v in f.items()}
-                              for a, f in feat.items()}
 
     # ---- bookkeeping
-    state["curve"].append({"t": now, "eq": {s: round(paper.equity(acct, marks), 2)
-                                            for s, acct in state["accounts"].items()}})
+    eq = {s: round(engine.equity(state["accounts"][s], marks), 2) for s in BOTS}
+    eq.update({s: round(paper.equity(state["accounts"][s], marks_legacy), 2) for s in CONTROLS})
+    state["curve"].append({"t": now, "eq": eq})
     state["curve"] = state["curve"][-24 * 400:]
-    state["trades"] = state["trades"][-5000:]
+    state["trades"] = state["trades"][-8000:]
     state["last_tick"] = now
     state["errors"] = errors
-    state["marks"] = marks
+    state["marks"] = {c: marks[c] for c in set(universe.DIRECTIONAL) | set(top30) | set(held_rv) if c in marks}
+    state["marks_legacy"] = marks_legacy
+    state["regimes"] = regimes(bots, t_to)
+    for c, row in state["regimes"].items():
+        sc, cf = analyst.view(nitems, c, t_to)
+        row["news"] = round(sc * cf, 3)
     write(state)
     return state
 
 
+def regimes(bots, T):
+    """What each directional bot sees right now, per market (for the dashboard)."""
+    out = {}
+    ms = next(b for b in bots if b.name == "ms_struct")
+    nr = next(b for b in bots if b.name == "news_regime")
+    ta = next(b for b in bots if b.name == "ta_trend")
+    for c in universe.DIRECTIONAL:
+        row = {}
+        d = ms.d.get(c)
+        if d:
+            i4, idd = d["h4"].at(T), d["d1"].at(T)
+            if i4 >= 0:
+                s4 = d["s4"][i4]
+                row["ms_4h"] = s4["trend"]
+                row["ms_protect"] = s4["protect"]
+                row["ms_leg"] = s4["leg"]
+            if idd >= 0:
+                row["ms_1d"] = d["sd"][idd]["trend"]
+        d = nr.d.get(c)
+        if d:
+            i = d["h4"].at(T)
+            if i >= 0 and d["adx"][i] is not None:
+                reg, tdir = nr.regime(d, i)
+                row["regime"] = reg + ("" if not tdir else (" up" if tdir > 0 else " down"))
+                row["adx"] = round(d["adx"][i], 1)
+        d = ta.d.get(c)
+        if d:
+            i = d["h4"].at(T)
+            if i >= 0:
+                row["ema_fast_above"] = d["f"][i] > d["s"][i]
+        out[c] = row
+    return out
+
+
 def _p(x):
-    return f"{x:.6g}" if isinstance(x, (int, float)) else x
+    return f"{x:.6g}" if isinstance(x, (int, float)) else ("" if x is None else x)
 
 
 def _utc(ms):
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S") if ms else ""
 
 
+def _market(t):
+    legacy = t["strategy"].removesuffix("_v1") in CONTROLS + RETIRED
+    return LEGACY.get(t["asset"], t["asset"]) if legacy else t["asset"]
+
+
 def write_csv(state):
     """Every trade with UTC timestamps and prices, for cross-checking on the exchange."""
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["strategy", "asset", "hyperliquid_market", "side", "opened_utc", "entry_price", "closed_utc",
-                "exit_price", "move_pct", "pnl_usd", "funding_usd", "reason"])
+    w.writerow(["strategy", "asset", "hyperliquid_market", "side", "setup", "signal_utc", "opened_utc", "entry_price",
+                "initial_stop", "closed_utc", "exit_price", "move_pct", "r_multiple", "pnl_usd", "funding_usd",
+                "reason", "recorded_utc", "note"])
     for t in state["trades"]:
-        w.writerow([t["strategy"], t["asset"], C.ASSETS[t["asset"]]["coin"], t["side"], _utc(t["opened"]), _p(t["entry"]),
-                    _utc(t["closed"]), _p(t["exit"]), t["move_pct"], t["pnl"], t["funding"], t["reason"]])
+        w.writerow([t["strategy"], t["asset"], _market(t), t["side"], t.get("setup", ""), _utc(t.get("signal_t")),
+                    _utc(t["opened"]), _p(t["entry"]), _p(t.get("stop0")), _utc(t["closed"]), _p(t["exit"]),
+                    t["move_pct"], _p(t.get("r")), t["pnl"], t["funding"], t["reason"], _utc(t.get("booked")),
+                    t.get("note", "")])
     (OUT / "trades.csv").write_text(buf.getvalue())
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["strategy", "asset", "hyperliquid_market", "side", "opened_utc", "entry_price", "stop_price",
-                "target_price", "mark_now", "funding_usd_so_far"])
+    w.writerow(["strategy", "asset", "hyperliquid_market", "side", "setup", "opened_utc", "entry_price", "stop_price",
+                "partial_target", "target_price", "mark_now", "funding_usd_so_far", "note"])
     for s, acct in state["accounts"].items():
         for a, p in acct["positions"].items():
-            w.writerow([s, a, C.ASSETS[a]["coin"], "long" if p["side"] > 0 else "short", _utc(p["opened"]),
-                        _p(p["entry"]), _p(p["stop"]), _p(p["target"]), _p(state.get("marks", {}).get(a)),
-                        round(p["funding"], 4)])
+            mk = state.get("marks_legacy", {}).get(a) if s in CONTROLS else state.get("marks", {}).get(a)
+            w.writerow([s, a, LEGACY.get(a, a) if s in CONTROLS else a, "long" if p["side"] > 0 else "short",
+                        p.get("setup", ""), _utc(p["opened"]), _p(p["entry"]), _p(p["stop"]), _p(p.get("tp1")),
+                        _p(p.get("target")), _p(mk), round(p["funding"], 4), p.get("note", "")])
     (OUT / "positions.csv").write_text(buf.getvalue())
 
 
@@ -180,35 +325,36 @@ def write(state):
     for old in sorted(BACKUPS.glob("state-*.json"))[:-KEEP_BACKUPS]:
         old.unlink()
     write_csv(state)
-    matrix = {th: {a: {k: v for k, v in c.items() if k in ("n", "mean_24h", "sd_24h", "hits")}
-                   for a, c in cells.items()} for th, cells in state["matrix"].items()}
+    v2 = state.get("v2_started", 0)
     summary = {
-        "updated": state["last_tick"], "decided_at": state.get("decided_at"), "config": {
-            "start_equity": C.START_EQUITY, "leverage": C.LEVERAGE, "stop_pct": C.STOP_PCT,
-            "target_pct": C.TARGET_PCT, "assets": {a: v["label"] for a, v in C.ASSETS.items()}},
-        "stats": stats(state), "curve": state["curve"][::max(1, len(state["curve"]) // 1500)],
-        "positions": {s: acct["positions"] for s, acct in state["accounts"].items()},
-        "signals": state["last_signals"], "weights": state["weights"], "features": state["last_features"],
-        "marks": state.get("marks", {}), "trades": state["trades"][-400:][::-1],
-        "markets": {a: v["coin"] for a, v in C.ASSETS.items()},
-        "news": state["news_feed"][:80], "matrix": matrix,
-        "priors": {th: v["prior"] for th, v in news.THEMES.items()},
-        "events_logged": len(state["events"]), "errors": state["errors"],
+        "version": 2, "updated": state["last_tick"], "v2_started": v2, "engine_T": state.get("engine_T"),
+        "config": {"start_equity": C.START_EQUITY, "directional": universe.DIRECTIONAL,
+                   "labels": {c: universe.label(c) for c in set(universe.DIRECTIONAL) | set(state.get("top30") or [])},
+                   "top30": state.get("top30") or universe.FALLBACK_TOP30, "top30_src": state.get("top30_src"),
+                   "params": {k: v for k, v in PARAMS.items()},
+                   "legacy_markets": LEGACY},
+        "bots": BOTS, "controls": CONTROLS, "stats": stats(state), "retired": state.get("retired", {}),
+        "curve": [p for p in state["curve"] if p["t"] >= v2][::max(1, len(state["curve"]) // 1500)],
+        "positions": {s: state["accounts"][s]["positions"] for s in BOTS + CONTROLS},
+        "orders": {s: state["accounts"][s].get("orders", {}) for s in BOTS},
+        "marks": state.get("marks", {}), "marks_legacy": state.get("marks_legacy", {}),
+        "trades": state["trades"][-500:][::-1], "regimes": state.get("regimes", {}),
+        "news_items": state.get("news_items", [])[:100], "analyst_status": state.get("analyst_status"),
+        "errors": state["errors"],
     }
     (OUT / "summary.json").write_text(json.dumps(summary, separators=(",", ":")))
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--decide", action="store_true")
     ap.add_argument("--reset", action="store_true")
     a = ap.parse_args()
     if a.reset and (OUT / "state.json").exists():
         (OUT / "state.json").unlink()
-    s = tick(force_decide=a.decide)
+    s = tick()
     st = stats(s)
-    print(f"tick {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC | " +
-          " | ".join(f"{k} ${v['equity']:.2f} ({v['trades']}t)" for k, v in st.items()))
+    print(f"tick {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC | analyst: {s.get('analyst_status')} | " +
+          " | ".join(f"{k} ${v['equity']:.2f} ({v['trades']}t, {v['open']} open)" for k, v in st.items()))
     if s["errors"]:
         print("errors:", s["errors"])
 

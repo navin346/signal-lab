@@ -19,7 +19,7 @@ concurrency:
 jobs:
   tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,7 +28,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: tests
-        run: python tests/test_core.py
+        run: python tests/test_core.py && python tests/test_engine.py
       - name: restore previous data (state, daily backups) from gh-pages
         run: |
           mkdir -p docs/data
@@ -37,6 +37,11 @@ jobs:
           fi
           ls -la docs/data docs/data/backups 2>/dev/null || true
       - name: run one tick
+        env:
+          # optional: add an ANTHROPIC_API_KEY repository secret to let Claude read the news;
+          # without it the bot uses keyword rules. NEWS_MODEL (repository variable) overrides the model.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEWS_MODEL: ${{ vars.NEWS_MODEL }}
         run: python -m lab.main
       - name: sanity-check output before publishing
         # if anything is wrong, the job fails here and gh-pages keeps the last good version
