@@ -57,7 +57,7 @@ class Broker:
             "move_pct": round(p["side"] * (px / p["entry"] - 1) * 100, 3),
             "r": round(p["side"] * (px - p["entry"]) / p["risk_px"], 2) if p.get("risk_px") else None,
             "pnl": round(pnl, 4), "funding": round(p["funding"] * share, 4), "reason": reason,
-            "booked": self.booked or ts, "note": p.get("note", "")})
+            "booked": self.booked or ts, "note": p.get("note", ""), "ctx": p.get("ctx")})
 
     def _exit(self, coin, qty, px, ts, reason, maker=False):
         p = self.acct["positions"][coin]
@@ -188,10 +188,12 @@ def bar_ms(bars):
 
 
 def run(strategies, accounts, data, funding, t_from, t_to, log, ctx=None, booked=None, curve=None,
-        curve_every_h=24):
+        curve_every_h=24, context_fn=None):
     """Replay every candle that closes in (t_from, t_to], hour by hour, through every strategy.
     data: {coin: candles} (1h, 4h or 1d; each coin's candles are handled at their close time).
-    funding: {coin: hourly rate} or a function (coin, t) -> hourly rate."""
+    funding: {coin: hourly rate} or a function (coin, t) -> hourly rate.
+    context_fn(strategy, coin, T, side) -> dict: market conditions stamped on every new position
+    (the watcher learns from them); strategies later in the list see earlier ones' stamps."""
     dur = {c: bar_ms(bars) for c, bars in data.items()}
     by_close = {c: {b["t"] + dur[c]: b for b in bars} for c, bars in data.items()}
     px = {}
@@ -214,6 +216,10 @@ def run(strategies, accounts, data, funding, t_from, t_to, log, ctx=None, booked
         for s in strategies:
             if (T // HOUR) % s.every_h == 0:
                 s.step(T, brokers[s.name], ctx or {})
+            if context_fn:
+                for c, p in accounts[s.name]["positions"].items():
+                    if "ctx" not in p:      # only fresh entries; older ones get no (wrong) stamp
+                        p["ctx"] = context_fn(s.name, c, T, p["side"]) if p["opened"] >= T - HOUR else {}
         if curve is not None and (T // HOUR) % curve_every_h == 0:
             curve.append({"t": T, "eq": {s.name: round(equity(accounts[s.name], px), 2) for s in strategies}})
         T += HOUR

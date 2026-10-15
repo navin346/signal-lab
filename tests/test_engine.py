@@ -156,6 +156,37 @@ def test_analyst_parses_claude_output():
     assert out[0]["by"] == "claude" and not status.startswith("keywords")
 
 
+def test_watcher_copies_mirrors_exits_and_learns():
+    from lab import watcher as W
+    data = {"BTC": [bar(i * HOUR, 100, 101, 99, 100) for i in range(300)]}
+
+    class Opener(engine.Strategy):
+        name, every_h, coins = "src", 1, ["BTC"]
+
+        def step(self, T, br, ctx):
+            if T == 250 * HOUR:
+                br.market("BTC", 1, 2.0, T, stop=90.0, setup="test")
+            if T == 260 * HOUR:
+                br.close("BTC", T, "source exit")
+    log = []
+    accts = {"src": engine.new_account(500.0), "watcher": engine.new_account(500.0)}
+    wt = W.Watcher(["src"], {"src": accts["src"]}, log, ["BTC"])
+    wt.prepare(data)
+    engine.run([Opener(), wt], accts, data, {}, 240 * HOUR, 270 * HOUR, log, context_fn=wt.context)
+    copies = [t for t in log if t["strategy"] == "watcher"]
+    assert len(copies) == 1 and copies[0]["reason"] == "src closed its trade"
+    assert abs(copies[0]["qty"] / (2.0 * W.BASE_SHARE) - 1) < 0.01    # 25% share, neutral while learning
+    src = [t for t in log if t["strategy"] == "src"][0]
+    assert src["ctx"]["side"] == "long" and "session" in src["ctx"]
+    # learning: a bot with many losing trades in one condition gets a smaller multiplier there
+    wt.log = [{"strategy": "src", "closed": 0, "pnl": 5.0, "ctx": {"regime": "trend"}}] * 60 + \
+             [{"strategy": "src", "closed": 0, "pnl": -5.0, "ctx": {"regime": "range"}}] * 60
+    wt.learn(1)
+    _, m_trend, _ = wt.expect("src", {"regime": "trend"})
+    _, m_range, _ = wt.expect("src", {"regime": "range"})
+    assert W.MULT_LO <= m_range < 1.0 < m_trend <= W.MULT_HI
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

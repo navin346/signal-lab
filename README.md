@@ -14,6 +14,7 @@ Each starts with a virtual **$500**; fees, slippage and Hyperliquid funding are 
 | **Relative value** | Market-neutral. The top-30 coins by market cap that trade on Hyperliquid; daily long the 5 strongest and short the 5 weakest over 3 days. | top 30 (CoinPaprika, refreshed daily) |
 | **News + regime** | The AI news analyst decides whether and which way to trade. The ADX regime (trend / range) sets the stop, target and holding time, ATR-scaled. Never trades on technicals alone. | same as market structure |
 | **TA trend** | 4H Donchian breakout (about 33 days) with an ADX trend filter, 2 ATR trailing stop, 1% risk. The backtest picked it over 4H EMA crossovers. | same |
+| **Watcher (self-learning)** | Records the conditions around every trade the four bots take (trend/range, with/against the daily structure, volatility, news, funding, time of day), learns which bot wins where, and copies their trades into its own account with a 0.5x–1.5x size tilt. It starts as an equal split. Free: statistics, no AI service. | whatever the bots trade |
 | Coin flip, Always long | **controls**: a bot matters only if it beats both over 100+ trades | BTC, ETH, SOL, gold, oil, Nasdaq |
 
 How each was chosen, what lost, and the biases: **[BACKTEST.md](BACKTEST.md)**.

@@ -76,7 +76,7 @@
   <header>
     <div>
       <h1>Signal Lab</h1>
-      <div class="sub">Four research bots vs two coin-flip-style controls. Paper trading only, no real money.</div>
+      <div class="sub">Four research bots, a self-learning watcher, and two coin-flip-style controls. Paper trading only, no real money.</div>
     </div>
     <div><span class="badge" id="updated">loading…</span><button id="theme" type="button">Theme</button></div>
   </header>
@@ -96,6 +96,16 @@
     <p class="note">Hover for every bot's value at that time. Grey dashed = coin flip, grey dotted = always long (the controls).</p>
     <div class="chart-box"><canvas id="equity" aria-label="Live equity curves per bot" role="img"></canvas></div>
     <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="card">
+    <h2>Watcher: what it has learned</h2>
+    <p class="note">The watcher copies the four bots into its own $500 account (a 25% share each) and learns which bot wins
+      in which conditions. It starts as an equal split and tilts each copy between 0.5x and 1.5x only as evidence piles up.
+      Conditions are only trusted after 30+ trades; "edge" is the extra profit (in R, 1R ≈ $5 = 1% risk) vs. the bot's average.
+      Started <span id="wstart"></span>.</p>
+    <ul id="journal" style="padding-left:18px;margin:0 0 10px"></ul>
+    <div class="scroll"><table id="wbots"></table></div>
   </div>
 
   <div class="card">
@@ -164,12 +174,12 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const NAMES = {ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
+const NAMES = {watcher:"Watcher (self-learning)", ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
   coin_flip:"Coin flip (control)", buy_hold:"Always long (control)", "BTC buy & hold":"BTC buy & hold",
   momentum_3d:"Trend 3d (v1)", momentum_7d:"Trend 7d (v1)", crowd_follow:"Follow crowd (v1)", crowd_fade:"Fade crowd (v1)",
   news:"News keywords (v1)", combo:"Combo (v1)", coin_flip_v1:"Coin flip (v1)", buy_hold_v1:"Always long (v1)"};
-const ORDER = ["ms_struct","rel_value","news_regime","ta_trend","coin_flip","buy_hold"];
-const SLOT = {ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
+const ORDER = ["watcher","ms_struct","rel_value","news_regime","ta_trend","coin_flip","buy_hold"];
+const SLOT = {watcher:"--s5", ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
   "BTC buy & hold":"--ctl"};
 const DASH = {coin_flip:[6,4], buy_hold:[2,3], "BTC buy & hold":[2,3]};
 const KEYCLS = {coin_flip:" dash", buy_hold:" dot", "BTC buy & hold":" dot"};
@@ -263,6 +273,14 @@ function render(d){
   trades(d);
   if (!location.hostname.endsWith("github.io")) { const base = RAW.replace("summary.json", ""); $("csv-trades").href = base + "trades.csv"; $("csv-pos").href = base + "positions.csv"; }
 
+  const W = d.watcher || {bots:{}, journal:[]};
+  $("wstart").textContent = d.watcher_started ? utc(d.watcher_started) + " UTC" : "–";
+  $("journal").replaceChildren(...(W.journal||[]).map(t => el("li", t)));
+  const cond = rs => (rs||[]).map(r => `${r.feature}=${r.value} (${sgn(r.edge,2)}R, n=${r.n})`).join("; ") || "–";
+  fill("wbots", ["Bot","Trades seen","Win rate","Avg R","Copy size now",{t:"Best conditions",c:"l"},{t:"Weakest conditions",c:"l"}],
+    Object.entries(W.bots||{}).map(([b,v]) => [keyFor(b), v.n, v.win==null?"–":fmt(v.win,1)+"%", v.avg_r==null?"–":sgn(v.avg_r,2),
+      v.warm ? "x"+fmt(v.multiplier,2) : {t:"x1.00 (learning)", c:"muted"}, {t:cond(v.best), c:"wrap-cell"}, {t:cond(v.worst), c:"wrap-cell"}]));
+
   fill("retired", ["Bot","Final equity","Trades","What it did"], Object.entries(d.retired||{}).map(([s,r]) =>
     [NAMES[s]||s, "$"+fmt(r.equity), r.trades ?? "–", {t:r.description, c:"wrap-cell"}]));
 }
@@ -294,7 +312,7 @@ function drawLive(d){
 }
 function drawBT(){
   if (!BT) return;
-  const names = ["ms_struct","rel_value","ta_trend","BTC buy & hold"].filter(n => BT.curves[n]);
+  const names = ["watcher","ms_struct","rel_value","ta_trend","BTC buy & hold"].filter(n => BT.curves[n]);
   const split = {id:"split", afterDraw(c){ const x=c.scales.x.getPixelForValue(BT.period[1]); const a=c.chartArea; const g=c.ctx; g.save();
     g.strokeStyle=css("--text-muted"); g.setLineDash([3,3]); g.beginPath(); g.moveTo(x,a.top); g.lineTo(x,a.bottom); g.stroke();
     g.fillStyle=css("--text-muted"); g.font="11px system-ui"; g.fillText("TRAIN ←  → TEST", x-46, a.top+12); g.restore(); }};

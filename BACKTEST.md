@@ -104,6 +104,29 @@ The regime rules alone lost in both halves (table above). So the bot never trade
 
 Whether the news adds an edge is exactly what the live paper run will show.
 
+### watcher (self-learning)
+The watcher copies the other bots into its own $500 account, a 25% share each. It learns which bot does well in which conditions:
+- trend or range;
+- with or against the daily structure;
+- volatility;
+- news;
+- funding;
+- time of day.
+
+It sizes each copy up or down from there. This backtest uses the three backtestable bots together. Results:
+
+| watcher variant | TRAIN | TEST | full year | max drawdown |
+|---|---|---|---|---|
+| plain equal split (no learning) | +14.2% (Sharpe 1.53) | +20.4% (1.91) | **+37.6%** | -9.5% |
+| bold learning (0x–2x, trusts 5-trade patterns) | +9.1% (1.14) | +20.5% (1.57) | +31.6% | -11.3% |
+| **live setting: cautious learning** (0.5x–1.5x, trusts 30-trade patterns) | +12.0% (1.38) | +20.8% (1.75) | +35.4% | -10.3% |
+
+**Learning did not beat a simple equal split this year.** The patterns it found were mostly noise, e.g. "the TA bot works best during Asian hours".
+
+What did help is combining the bots: an equal split had about half the drawdown of any single bot (-9.5% vs -20% to -36%).
+
+The live watcher therefore stays close to the equal split, and only tilts when a pattern has 30+ trades behind it. It records the conditions from day one, so in a few months there will be enough live data to judge whether learning adds anything. Reproduce with `python -m backtest.watcher_bt --data CACHE`.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

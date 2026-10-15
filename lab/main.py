@@ -18,6 +18,7 @@ from pathlib import Path
 from lab import analyst, engine, learn, market, news, paper, signals, universe
 from lab import config as C
 from lab import strategies as S
+from lab import watcher as W
 
 OUT = Path(__file__).resolve().parent.parent / "docs" / "data"
 BACKUPS = OUT / "backups"
@@ -46,8 +47,10 @@ def build(top30, held_rv):
             S.TATrend(universe.DIRECTIONAL, **PARAMS["ta_trend"])]
 
 
-BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]
+BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
+ACTIVE = BOTS + ["watcher"]
 DESCRIPTIONS = {
+    "watcher": W.Watcher.description,
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
     "news_regime": S.NewsRegime.description, "ta_trend": S.TATrend.description,
     "coin_flip": signals.DESCRIPTIONS["coin_flip"], "buy_hold": signals.DESCRIPTIONS["buy_hold"],
@@ -79,6 +82,10 @@ def migrate(state, marks_legacy, now):
     """v1 -> v2: retire the naive v1 bots (close their positions, keep their history), add the
     four research bots with fresh $500 accounts, keep the two controls running."""
     if state.get("version") == 2:
+        if "watcher" not in state["accounts"]:            # v2 -> v2 + watcher
+            state["accounts"]["watcher"] = engine.new_account(C.START_EQUITY)
+            state["watcher_started"] = now
+            state["watcher_backfill"] = True
         return
     retired = {}
     for s in RETIRED + CONTROLS:              # controls restart too, so every bot starts level
@@ -97,8 +104,9 @@ def migrate(state, marks_legacy, now):
             t["strategy"] += "_v1"
     for s in CONTROLS:
         state["accounts"][s] = paper.new_account()
-    for s in BOTS:
+    for s in ACTIVE:
         state["accounts"][s] = engine.new_account(C.START_EQUITY)
+    state["watcher_started"] = now
     state["last_decision"] = None                  # controls re-enter right away
     state.update({"version": 2, "retired": retired, "v2_started": now, "engine_T": now // HOUR * HOUR,
                   "news_items": [], "top30": None, "top30_src": None, "top30_day": None})
@@ -106,7 +114,7 @@ def migrate(state, marks_legacy, now):
 
 def stats(state):
     out = {}
-    for s in BOTS + CONTROLS:
+    for s in ACTIVE + CONTROLS:
         tr = [t for t in state["trades"] if t["strategy"] == s]
         curve = [p["eq"][s] for p in state["curve"] if s in p["eq"]]
         peak, dd = C.START_EQUITY, 0.0
@@ -193,11 +201,25 @@ def tick():
     bots = build(top30, held_rv)
     for b in bots:
         b.prepare(data)
-    accts = {s: state["accounts"][s] for s in BOTS}
+    ctx = {"news": lambda coin, T: analyst.view(nitems, coin, T)}
+    wt = W.Watcher(BOTS, {s: state["accounts"][s] for s in BOTS}, state["trades"], list(data),
+                   funding=lambda c, t: funding.get(c))
+    wt.prepare(data)
+    wt.ctx = ctx
+    if state.pop("watcher_backfill", False):              # stamp conditions on trades made before it existed
+        for t in state["trades"]:
+            if t["strategy"] in BOTS and t.get("ctx") is None:
+                t["ctx"] = wt.context(t["strategy"], t["asset"], t.get("signal_t") or t["opened"],
+                                      1 if t["side"] == "long" else -1)
+        for s in BOTS:
+            for c, p in state["accounts"][s]["positions"].items():
+                p.setdefault("ctx", wt.context(s, c, p.get("signal_t") or p["opened"], p["side"]))
+    accts = {s: state["accounts"][s] for s in ACTIVE}
     fund_fn = {c: funding.get(c, 0.0) for c in data}
-    engine.run(bots, accts, data, fund_fn, t_from, t_to, state["trades"],
-               ctx={"news": lambda coin, T: analyst.view(nitems, coin, T)}, booked=now)
+    engine.run(bots + [wt], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
+               context_fn=wt.context)
     state["engine_T"] = t_to
+    state["watcher_report"] = wt.report(t_to)
 
     # ---- controls (unchanged from v1): daily coin flip / always long on the six v1 markets
     for s in CONTROLS:
@@ -219,7 +241,7 @@ def tick():
         state["last_signals"] = decision
 
     # ---- bookkeeping
-    eq = {s: round(engine.equity(state["accounts"][s], marks), 2) for s in BOTS}
+    eq = {s: round(engine.equity(state["accounts"][s], marks), 2) for s in ACTIVE}
     eq.update({s: round(paper.equity(state["accounts"][s], marks_legacy), 2) for s in CONTROLS})
     state["curve"].append({"t": now, "eq": eq})
     state["curve"] = state["curve"][-24 * 400:]
@@ -333,10 +355,11 @@ def write(state):
                    "top30": state.get("top30") or universe.FALLBACK_TOP30, "top30_src": state.get("top30_src"),
                    "params": {k: v for k, v in PARAMS.items()},
                    "legacy_markets": LEGACY},
-        "bots": BOTS, "controls": CONTROLS, "stats": stats(state), "retired": state.get("retired", {}),
+        "bots": ACTIVE, "controls": CONTROLS, "stats": stats(state), "retired": state.get("retired", {}),
         "curve": [p for p in state["curve"] if p["t"] >= v2][::max(1, len(state["curve"]) // 1500)],
-        "positions": {s: state["accounts"][s]["positions"] for s in BOTS + CONTROLS},
-        "orders": {s: state["accounts"][s].get("orders", {}) for s in BOTS},
+        "positions": {s: state["accounts"][s]["positions"] for s in ACTIVE + CONTROLS},
+        "orders": {s: state["accounts"][s].get("orders", {}) for s in ACTIVE},
+        "watcher": state.get("watcher_report"), "watcher_started": state.get("watcher_started"),
         "marks": state.get("marks", {}), "marks_legacy": state.get("marks_legacy", {}),
         "trades": state["trades"][-500:][::-1], "regimes": state.get("regimes", {}),
         "news_items": state.get("news_items", [])[:100], "analyst_status": state.get("analyst_status"),
