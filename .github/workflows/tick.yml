@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -56,6 +56,22 @@ jobs:
                 len(list((d / "backups").glob("*.json"))), "daily backups")
           PY
       - name: publish dashboard + data
+        id: publish
+        continue-on-error: true    # a one-off git push hiccup is retried below
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: signal-lab-bot
+          user_email: signal-lab-bot@users.noreply.github.com
+          commit_message: "tick"
+      - name: wait before retrying the publish
+        if: steps.publish.outcome == 'failure'
+        run: sleep 45
+      - name: publish dashboard + data (retry)
+        if: steps.publish.outcome == 'failure'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
