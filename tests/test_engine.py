@@ -187,6 +187,26 @@ def test_watcher_copies_mirrors_exits_and_learns():
     assert W.MULT_LO <= m_range < 1.0 < m_trend <= W.MULT_HI
 
 
+def test_rel_value_skips_extreme_movers():
+    from lab import strategies as S
+    D = 24 * HOUR
+    moves = {f"C{i}": 1 + (i - 6) * 0.01 for i in range(12)}        # gentle spread of 7-day moves
+    moves["CRASH"] = 0.6                                             # one coin fell 40%: extreme
+    data = {}
+    for c, m in moves.items():
+        data[c] = [bar(k * D, 1, 1, 1, 1.0 if k < 10 else m) for k in range(14)]
+    data["BTC"] = [bar(k * D, 1, 1, 1, 1.0) for k in range(14)]
+    T = 14 * D
+    for max_z, expect_short in ((None, True), (2.0, False)):
+        rv = S.RelativeValue(list(data), mode="momentum", lookback_d=7, n_side=3, hold_band=1, max_z=max_z)
+        rv.prepare(data)
+        br, acct, _ = broker()
+        br.px.update({c: v[-1]["c"] for c, v in data.items()})
+        rv.step(T, br, {})
+        assert ("CRASH" in acct["positions"]) == expect_short
+        assert sum(p["side"] < 0 for p in acct["positions"].values()) == 3   # still a full short book
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

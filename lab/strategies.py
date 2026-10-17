@@ -378,14 +378,15 @@ class NewsRegime(Strategy):
 class RelativeValue(Strategy):
     name, every_h = "rel_value", 24
     description = ("Relative value, market-neutral: top-30 Hyperliquid coins by market cap; once a day go long "
-                   "the 5 strongest and short the 5 weakest over the last 3 days (equal dollars each side, "
-                   "keep a coin while it stays in the top/bottom 8)")
+                   "the 5 strongest and short the 5 weakest over the last 7 days (equal dollars each side, keep a "
+                   "coin while it stays in the top/bottom 8). Skips coins whose move is extreme (more than 2 "
+                   "standard deviations from the pack): crashed coins tend to bounce violently")
 
     def __init__(self, coins, mode="residual", lookback_d=3, beta_d=30, n_side=5, gross_lev=2.0, hold_band=3,
-                 funding=None):
+                 funding=None, sizing="equal", max_z=None):
         self.coins = coins
         self.p = dict(mode=mode, lookback_d=lookback_d, beta_d=beta_d, n_side=n_side, gross_lev=gross_lev,
-                      hold_band=hold_band)
+                      hold_band=hold_band, sizing=sizing, max_z=max_z)
         self.funding = funding
         self.d, self.btc = {}, None
 
@@ -411,6 +412,26 @@ class RelativeValue(Strategy):
         mx, my = sum(x) / n, sum(y) / n
         vx = sum((v - mx) ** 2 for v in x)
         return sum((a - mx) * (b - my) for a, b in zip(x, y)) / vx if vx else None
+
+    def _vol(self, tf, T, n=30):
+        i = tf.at(T)
+        if i < n:
+            return None
+        r = [math.log(tf.b[i - k]["c"] / tf.b[i - k - 1]["c"]) for k in range(n)]
+        m = sum(r) / n
+        return math.sqrt(sum((x - m) ** 2 for x in r) / n) or None
+
+    def _size(self, c, T, vols):
+        """Leg size multiplier. inv_vol: wild coins get smaller legs; beta: each leg carries
+        about the same BTC-beta, so a long book of calm coins vs a short book of wild ones is
+        not secretly net short the market (what hurt in the Oct 15 bounce)."""
+        if self.p["sizing"] == "inv_vol" and vols.get(c):
+            med = sorted(v for v in vols.values() if v)[len([v for v in vols.values() if v]) // 2]
+            return max(0.33, min(2.0, med / vols[c]))
+        if self.p["sizing"] == "beta":
+            b = 1.0 if c == "BTC" else self._beta(self.d[c], T)
+            return max(0.33, min(2.0, 1 / b)) if b and b > 0 else 1.0
+        return 1.0
 
     def scores(self, T):
         """Higher score = more 'expensive' (short candidate)."""
@@ -444,7 +465,12 @@ class RelativeValue(Strategy):
         if len(sc) < 2 * n + 2:
             return
         ranked = sorted(sc, key=sc.get)
-        longs, shorts = set(ranked[:n]), set(ranked[-n:])
+        blocked = set()
+        if self.p["max_z"]:                                  # skip the most extreme movers for NEW entries:
+            vals = list(sc.values())                          # crashed coins bounce hardest (squeezes)
+            mu = sum(vals) / len(vals)
+            sd = math.sqrt(sum((v - mu) ** 2 for v in vals) / len(vals)) or 1.0
+            blocked = {c for c, v in sc.items() if abs(v - mu) / sd > self.p["max_z"]}
         keep_l = set(ranked[:n + self.p["hold_band"]])       # hysteresis: fewer, cheaper trades
         keep_s = set(ranked[-(n + self.p["hold_band"]):])
         for c, p in list(br.acct["positions"].items()):
@@ -452,15 +478,17 @@ class RelativeValue(Strategy):
                 br.close(c, T, "rebalance")
         eq = br.equity()
         leg = eq * self.p["gross_lev"] / (2 * n)
+        vols = {c: self._vol(self.d[c], T) for c in sc} if self.p["sizing"] == "inv_vol" else {}
         held_l = sum(1 for p in br.acct["positions"].values() if p["side"] > 0)
         held_s = sum(1 for p in br.acct["positions"].values() if p["side"] < 0)
-        for side, names in ((1, ranked[:n]), (-1, ranked[::-1][:n])):
+        k = n + (self.p["hold_band"] if blocked else 0)     # skipped extremes -> take the next in line
+        for side, names in ((1, ranked[:k]), (-1, ranked[::-1][:k])):
             for c in names:
                 if (held_l if side > 0 else held_s) >= n:
                     break
-                if br.position(c) or c not in br.px:
+                if br.position(c) or c not in br.px or c in blocked:
                     continue
-                if br.market(c, side, leg / br.px[c], T, stop=br.px[c] * (1 - side * 0.5), setup=f"RV {self.p['mode']}",
+                if br.market(c, side, leg * self._size(c, T, vols) / br.px[c], T, stop=br.px[c] * (1 - side * 0.5), setup=f"RV {self.p['mode']}",
                              note=f"score {sc[c]:+.4f}", signal_t=T, track_r=False):
                     if side > 0:
                         held_l += 1

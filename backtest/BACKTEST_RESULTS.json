@@ -95,40 +95,41 @@
   "rel_value": {
    "params": {
     "mode": "momentum",
-    "lookback_d": 3,
+    "lookback_d": 7,
     "n_side": 5,
     "hold_band": 3,
-    "gross_lev": 2.0
+    "gross_lev": 2.0,
+    "max_z": 2.0
    },
    "train": {
-    "ret_pct": 29.72,
-    "max_dd_pct": -33.13,
-    "sharpe": 1.26,
-    "trades": 583,
-    "win_pct": 46.5,
-    "pf": 1.09,
-    "avg_r": 0.01,
-    "fees_funding": -7.06
+    "ret_pct": 73.21,
+    "max_dd_pct": -19.69,
+    "sharpe": 2.66,
+    "trades": 330,
+    "win_pct": 44.8,
+    "pf": 1.24,
+    "avg_r": null,
+    "fees_funding": -7.68
    },
    "test": {
-    "ret_pct": 36.05,
-    "max_dd_pct": -36.48,
-    "sharpe": 1.31,
-    "trades": 587,
-    "win_pct": 44.6,
-    "pf": 1.06,
-    "avg_r": 0.01,
-    "fees_funding": -28.17
+    "ret_pct": 67.57,
+    "max_dd_pct": -23.37,
+    "sharpe": 2.08,
+    "trades": 352,
+    "win_pct": 41.8,
+    "pf": 1.2,
+    "avg_r": null,
+    "fees_funding": -39.85
    },
    "full": {
-    "ret_pct": 77.04,
-    "max_dd_pct": -36.48,
-    "sharpe": 1.29,
-    "trades": 1170,
-    "win_pct": 45.6,
-    "pf": 1.07,
-    "avg_r": 0.01,
-    "fees_funding": -35.24
+    "ret_pct": 192.18,
+    "max_dd_pct": -23.37,
+    "sharpe": 2.33,
+    "trades": 682,
+    "win_pct": 43.3,
+    "pf": 1.21,
+    "avg_r": null,
+    "fees_funding": -47.53
    },
    "period": [
     1762430400000,
@@ -321,7 +322,7 @@
     "trades": 596,
     "win_pct": 51.0,
     "pf": 0.74,
-    "avg_r": -0.01,
+    "avg_r": null,
     "fees_funding": 2.55
    },
    "test": {
@@ -331,7 +332,7 @@
     "trades": 575,
     "win_pct": 52.5,
     "pf": 0.74,
-    "avg_r": -0.01,
+    "avg_r": null,
     "fees_funding": 3.29
    },
    "full": {
@@ -341,7 +342,7 @@
     "trades": 1171,
     "win_pct": 51.8,
     "pf": 0.74,
-    "avg_r": -0.01,
+    "avg_r": null,
     "fees_funding": 5.84
    },
    "period": [
@@ -364,7 +365,7 @@
     "trades": 127,
     "win_pct": 51.2,
     "pf": 1.15,
-    "avg_r": 0.01,
+    "avg_r": null,
     "fees_funding": 38.26
    },
    "test": {
@@ -374,7 +375,7 @@
     "trades": 135,
     "win_pct": 54.8,
     "pf": 1.0,
-    "avg_r": -0.0,
+    "avg_r": null,
     "fees_funding": 54.16
    },
    "full": {
@@ -384,7 +385,7 @@
     "trades": 262,
     "win_pct": 53.1,
     "pf": 1.06,
-    "avg_r": 0.0,
+    "avg_r": null,
     "fees_funding": 92.42
    },
    "period": [
@@ -407,7 +408,7 @@
     "trades": 323,
     "win_pct": 44.3,
     "pf": 1.16,
-    "avg_r": 0.02,
+    "avg_r": null,
     "fees_funding": -5.66
    },
    "test": {
@@ -417,7 +418,7 @@
     "trades": 325,
     "win_pct": 43.4,
     "pf": 1.17,
-    "avg_r": 0.02,
+    "avg_r": null,
     "fees_funding": -32.96
    },
    "full": {
@@ -427,7 +428,7 @@
     "trades": 648,
     "win_pct": 43.8,
     "pf": 1.16,
-    "avg_r": 0.02,
+    "avg_r": null,
     "fees_funding": -38.62
    },
    "period": [

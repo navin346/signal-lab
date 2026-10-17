@@ -33,9 +33,10 @@ python -m backtest.report --data CACHE
 | ta_trend | train | +12.0% | -16.3% | 0.77 | 56 | 39.3% | 1.43 |
 | ta_trend | test | +28.0% | -19.3% | 1.30 | 122 | 32.8% | 1.40 |
 | ta_trend | full | +43.3% | -21.4% | 1.05 | 178 | 34.8% | 1.41 |
-| rel_value | train | +29.7% | -33.1% | 1.26 | 583 | 46.5% | 1.09 |
-| rel_value | test | +36.0% | -36.5% | 1.31 | 587 | 44.6% | 1.06 |
-| rel_value | full | +77.0% | -36.5% | 1.29 | 1170 | 45.6% | 1.07 |
+| rel_value (since Oct 17) | train | +73.2% | -19.7% | 2.66 | 330 | 44.8% | 1.24 |
+| rel_value (since Oct 17) | test | +67.6% | -23.4% | 2.08 | 352 | 41.8% | 1.20 |
+| rel_value (since Oct 17) | full | +192.2% | -23.4% | 2.33 | 682 | 43.3% | 1.21 |
+| rel_value (Oct 12-17: 3-day, no filter) | full | +77.0% | -36.5% | 1.29 | 1170 | 45.6% | 1.07 |
 | BTC buy & hold | full | -17.3% | | | | | |
 
 **Error bars.** A 95% block-bootstrap range on the full-period return shows how much luck is in these numbers:
@@ -44,7 +45,7 @@ python -m backtest.report --data CACHE
 |---|---|---|
 | ms_struct | -17% to +270% | 7% |
 | ta_trend | -37% to +303% | 22% |
-| rel_value | -45% to +560% | 16% |
+| rel_value (Oct 12-17 version) | -45% to +560% | 16% |
 
 So these numbers are encouraging, not proof. **news_regime cannot be backtested**: there is no archive of timestamped headlines. It is judged live only.
 
@@ -97,6 +98,33 @@ Each day the bot ranks the top-30 coins and goes long the 5 cheapest and short t
 
 The single train-best setting (28d residual reversal) was positive in only one of the two TRAIN quarters and lost in TEST. 3-day momentum was positive in both TRAIN quarters and in TEST. This choice was made after seeing TEST, so the TEST number for rel_value is optimistic.
 
+#### Oct 17 change: skip extreme movers, 7-day lookback
+**What happened live.** On Oct 15 the market bounced. The bot was short the coins that had crashed the most over 3 days:
+- NEAR -19%, then bounced +18% in five hours;
+- ENA -19.5%, then +10%;
+- PUMP, WLD and HBAR, then +5 to +8%.
+
+Its longs were the calm coins (BTC, BNB, XMR), which rose only about 2%. Equal dollars on each side, but very unequal "bounciness". The book lost about $43 in an afternoon.
+
+This is the textbook way momentum strategies get hurt: the biggest losers snap back hardest.
+
+**Fixes tested on the same year (TRAIN / TEST return, Sharpe):**
+
+| variant | TRAIN | TEST |
+|---|---|---|
+| 3-day, as it was | +29.7% (1.26) | +36.1% (1.31) |
+| 3-day + skip extreme movers (|z| > 2) | +31.4% (1.31) | +64.5% (1.88) |
+| 7-day, no filter | +41.0% (1.62) | +60.1% (1.94) |
+| **7-day + skip extreme movers (live)** | **+73.2% (2.66)** | **+67.6% (2.08)** |
+| beta-weighted legs (smaller shorts in wild coins) | worse in TEST for every lookback | |
+| inverse-volatility legs | worse in TRAIN | |
+
+**Skip extreme movers:** don't open a new leg in a coin whose move is more than 2 standard deviations from the other 29. It improved both halves at both lookbacks, and gave positive or flat results in all four quarters.
+
+Using real Hyperliquid prices, it would have blocked exactly the two worst Oct 15 shorts: ENA (z = -2.25) and NEAR (z = -2.14).
+
+The move to a 7-day lookback was picked with the whole year in view, so the TEST number is optimistic. The Oct 12 version's last quarter was -11.7%, so recent conditions were already hard for it.
+
 ### news_regime
 The regime rules alone lost in both halves (table above). So the bot never trades on them:
 - every entry needs the AI news analyst's view to agree;
@@ -120,6 +148,12 @@ It sizes each copy up or down from there. This backtest uses the three backtesta
 | plain equal split (no learning) | +14.2% (Sharpe 1.53) | +20.4% (1.91) | **+37.6%** | -9.5% |
 | bold learning (0x–2x, trusts 5-trade patterns) | +9.1% (1.14) | +20.5% (1.57) | +31.6% | -11.3% |
 | **live setting: cautious learning** (0.5x–1.5x, trusts 30-trade patterns) | +12.0% (1.38) | +20.8% (1.75) | +35.4% | -10.3% |
+
+These numbers are with the Oct 12 relative-value settings. With the Oct 17 settings:
+- equal split: +68.3% (max drawdown -7.7%);
+- cautious learning: +73.4% (max drawdown -9.8%).
+
+Learning was slightly ahead in TEST and behind in TRAIN: still no clear evidence it adds anything.
 
 **Learning did not beat a simple equal split this year.** The patterns it found were mostly noise, e.g. "the TA bot works best during Asian hours".
 
