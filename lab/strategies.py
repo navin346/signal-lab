@@ -380,13 +380,14 @@ class RelativeValue(Strategy):
     description = ("Relative value, market-neutral: top-30 Hyperliquid coins by market cap; once a day go long "
                    "the 5 strongest and short the 5 weakest over the last 7 days (equal dollars each side, keep a "
                    "coin while it stays in the top/bottom 8). Skips coins whose move is extreme (more than 2 "
-                   "standard deviations from the pack): crashed coins tend to bounce violently")
+                   "standard deviations from the pack): crashed coins tend to bounce violently. Trades smaller (down to "
+                   "1/3 size) when its own daily swings are bigger than usual")
 
     def __init__(self, coins, mode="residual", lookback_d=3, beta_d=30, n_side=5, gross_lev=2.0, hold_band=3,
-                 funding=None, sizing="equal", max_z=None):
+                 funding=None, sizing="equal", max_z=None, leg_stop_k=None, vol_scale=False):
         self.coins = coins
         self.p = dict(mode=mode, lookback_d=lookback_d, beta_d=beta_d, n_side=n_side, gross_lev=gross_lev,
-                      hold_band=hold_band, sizing=sizing, max_z=max_z)
+                      hold_band=hold_band, sizing=sizing, max_z=max_z, leg_stop_k=leg_stop_k, vol_scale=vol_scale)
         self.funding = funding
         self.d, self.btc = {}, None
 
@@ -420,6 +421,22 @@ class RelativeValue(Strategy):
         r = [math.log(tf.b[i - k]["c"] / tf.b[i - k - 1]["c"]) for k in range(n)]
         m = sum(r) / n
         return math.sqrt(sum((x - m) ** 2 for x in r) / n) or None
+
+    def _book_scale(self, br, eq):
+        """Volatility targeting (Barroso & Santa-Clara): when the book's own daily swings over the
+        last 20 days are bigger than its usual (median of the last 120 days), shrink new legs in
+        proportion. Never scales above 1x."""
+        hist = br.acct["mem"].setdefault("eq_hist", [])
+        hist.append(eq)
+        del hist[:-140]
+        if not self.p["vol_scale"] or len(hist) < 40:
+            return 1.0
+        r = [hist[i] / hist[i - 1] - 1 for i in range(1, len(hist)) if hist[i - 1] > 0]
+        sd = lambda x: math.sqrt(sum((v - sum(x) / len(x)) ** 2 for v in x) / len(x))
+        recent = sd(r[-20:])
+        rolling = sorted(sd(r[i - 20:i]) for i in range(20, len(r) + 1))
+        usual = rolling[len(rolling) // 2]
+        return max(0.33, min(1.0, usual / recent)) if recent else 1.0
 
     def _size(self, c, T, vols):
         """Leg size multiplier. inv_vol: wild coins get smaller legs; beta: each leg carries
@@ -477,8 +494,8 @@ class RelativeValue(Strategy):
             if (p["side"] > 0 and c not in keep_l) or (p["side"] < 0 and c not in keep_s) or c not in sc:
                 br.close(c, T, "rebalance")
         eq = br.equity()
-        leg = eq * self.p["gross_lev"] / (2 * n)
-        vols = {c: self._vol(self.d[c], T) for c in sc} if self.p["sizing"] == "inv_vol" else {}
+        leg = eq * self.p["gross_lev"] / (2 * n) * self._book_scale(br, eq)
+        vols = {c: self._vol(self.d[c], T) for c in sc} if self.p["sizing"] == "inv_vol" or self.p["leg_stop_k"] else {}
         held_l = sum(1 for p in br.acct["positions"].values() if p["side"] > 0)
         held_s = sum(1 for p in br.acct["positions"].values() if p["side"] < 0)
         k = n + (self.p["hold_band"] if blocked else 0)     # skipped extremes -> take the next in line
@@ -488,7 +505,10 @@ class RelativeValue(Strategy):
                     break
                 if br.position(c) or c not in br.px or c in blocked:
                     continue
-                if br.market(c, side, leg * self._size(c, T, vols) / br.px[c], T, stop=br.px[c] * (1 - side * 0.5), setup=f"RV {self.p['mode']}",
+                k = self.p["leg_stop_k"]
+                stop_dist = min(0.5, k * vols[c]) if k and vols.get(c) else 0.5     # default: disaster stop only
+                if br.market(c, side, leg * self._size(c, T, vols) / br.px[c], T, stop=br.px[c] * (1 - side * stop_dist),
+                             setup=f"RV {self.p['mode']}",
                              note=f"score {sc[c]:+.4f}", signal_t=T, track_r=False):
                     if side > 0:
                         held_l += 1

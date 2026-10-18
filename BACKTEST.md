@@ -125,6 +125,20 @@ Using real Hyperliquid prices, it would have blocked exactly the two worst Oct 1
 
 The move to a 7-day lookback was picked with the whole year in view, so the TEST number is optimistic. The Oct 12 version's last quarter was -11.7%, so recent conditions were already hard for it.
 
+#### Oct 18: protections tested on top (7-day + skip-extremes)
+| variant | TRAIN | TEST (max drawdown) | worst quarter | worst day |
+|---|---|---|---|---|
+| 7-day + skip extremes (Oct 17) | +73.2% | +67.6% (-23.4%) | -0.3% | -9.3% |
+| + **volatility targeting (live from Oct 18)** | +71.0% | +56.3% (-18.6%) | 0.0% | -7.5% |
+| + stop-loss on each leg at 3x its daily volatility | +64.9% | +62.0% (-23.7%) | -1.3% | -9.4% |
+| + stop-loss at 2x daily volatility | +51.0% | +35.8% (-25.2%) | -4.2% | -9.3% |
+| for reference: 7-day without skip-extremes | +41.0% | +60.1% (-22.2%) | -7.9% | -13.9% |
+
+- **Per-leg stops:** they cut returns and did not reduce the worst day. A squeeze moves fast, and a stopped leg misses the reversal.
+- **Volatility targeting:** when the book's last-20-day swings exceed its usual level, new legs shrink, down to one third. It never sizes up. It costs some return but lowers the drawdown and the worst day.
+
+Live, it needs about 40 days of the bot's own history before it can act. Until then the skip-extremes rule is the main protection.
+
 ### news_regime
 The regime rules alone lost in both halves (table above). So the bot never trades on them:
 - every entry needs the AI news analyst's view to agree;

@@ -36,7 +36,8 @@ PARAMS = {
     "ta_trend": dict(mode="donchian", fast=50, slow=200, adx_min=20.0, atr_mult=2.0, risk_pct=1.0),
     "news_regime": dict(),
     # Oct 17: 7-day lookback + skip extreme movers (|z| > 2) after the Oct 15 short squeeze; see BACKTEST.md
-    "rel_value": dict(mode="momentum", lookback_d=7, n_side=5, hold_band=3, gross_lev=2.0, max_z=2.0),
+    # Oct 18: + volatility targeting (shrinks new legs when the book is swinging more than usual)
+    "rel_value": dict(mode="momentum", lookback_d=7, n_side=5, hold_band=3, gross_lev=2.0, max_z=2.0, vol_scale=True),
 }
 
 
