@@ -139,6 +139,23 @@ The move to a 7-day lookback was picked with the whole year in view, so the TEST
 
 Live, it needs about 40 days of the bot's own history before it can act. Until then the skip-extremes rule is the main protection.
 
+#### Oct 19: hourly circuit breaker
+**Rule:** the book is checked every hour. If it has lost more than X% since the day's rebalance, it is cut (in half, or closed) until the next rebalance.
+
+This test used hourly prices: Binance spot for 26 of the 30 coins, Hyperliquid 4h for HYPE, XMR, CC and SHIB. Compare rows only within this table.
+
+| breaker | TRAIN (Sharpe) | TEST (Sharpe) | full-year max drawdown | worst day | times it fired |
+|---|---|---|---|---|---|
+| none | +50.0% (2.69) | +25.8% (1.70) | -21.9% | -7.4% | 0 |
+| 3%, cut half | +37.4% (2.43) | +34.6% (2.46) | -23.9% | -4.6% | ~23 |
+| 4%, cut half | +38.8% (2.38) | +42.1% (2.56) | -23.5% | -5.8% | ~10 |
+| **5%, cut half (live)** | **+55.9% (3.04)** | **+38.8% (2.38)** | -21.5% | -6.4% | ~4 |
+| 5%, close everything | +57.0% (3.05) | +35.0% (2.18) | -21.5% | -5.8% | ~5 |
+
+- **5%, cut half** was the only setting better than no breaker in both halves.
+- **It stops sudden one-day crashes but not slow bleeds.** The max drawdown barely changed.
+- **Tighter breakers** fire more often and give up returns in the TRAIN half.
+
 ### news_regime
 The regime rules alone lost in both halves (table above). So the bot never trades on them:
 - every entry needs the AI news analyst's view to agree;

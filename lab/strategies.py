@@ -381,13 +381,18 @@ class RelativeValue(Strategy):
                    "the 5 strongest and short the 5 weakest over the last 7 days (equal dollars each side, keep a "
                    "coin while it stays in the top/bottom 8). Skips coins whose move is extreme (more than 2 "
                    "standard deviations from the pack): crashed coins tend to bounce violently. Trades smaller (down to "
-                   "1/3 size) when its own daily swings are bigger than usual")
+                   "1/3 size) when its own daily swings are bigger than usual. Watched every hour: if the book loses "
+                   "5% in a day it is cut in half until the next daily rebalance")
 
     def __init__(self, coins, mode="residual", lookback_d=3, beta_d=30, n_side=5, gross_lev=2.0, hold_band=3,
-                 funding=None, sizing="equal", max_z=None, leg_stop_k=None, vol_scale=False):
+                 funding=None, sizing="equal", max_z=None, leg_stop_k=None, vol_scale=False, breaker_pct=None,
+                 breaker_action="half"):
         self.coins = coins
         self.p = dict(mode=mode, lookback_d=lookback_d, beta_d=beta_d, n_side=n_side, gross_lev=gross_lev,
-                      hold_band=hold_band, sizing=sizing, max_z=max_z, leg_stop_k=leg_stop_k, vol_scale=vol_scale)
+                      hold_band=hold_band, sizing=sizing, max_z=max_z, leg_stop_k=leg_stop_k, vol_scale=vol_scale,
+                      breaker_pct=breaker_pct, breaker_action=breaker_action)
+        if breaker_pct:
+            self.every_h = 1                                   # watch the book every hour
         self.funding = funding
         self.d, self.btc = {}, None
 
@@ -476,7 +481,31 @@ class RelativeValue(Strategy):
                 out[c] = r
         return out
 
+    def _breaker(self, T, br):
+        """Intraday circuit breaker: if the book has lost more than breaker_pct of its value since
+        the last daily rebalance, cut it (half or all) and wait for the next rebalance."""
+        mem = br.acct["mem"]
+        if mem.get("halted") or not br.acct["positions"] or not mem.get("day_eq"):
+            return
+        eq = br.equity()
+        if eq < mem["day_eq"] * (1 - self.p["breaker_pct"] / 100):
+            for c, p in list(br.acct["positions"].items()):
+                if self.p["breaker_action"] == "all":
+                    br.close(c, T, f"circuit breaker: book -{self.p['breaker_pct']}% today")
+                else:
+                    br._exit(c, p["qty"] / 2, br.px[c] * (1 - p["side"] * 2e-4), T,
+                             f"circuit breaker: book -{self.p['breaker_pct']}% today, halved")
+            mem["halted"] = T
+
     def step(self, T, br, ctx):
+        if self.p["breaker_pct"] and T % DAY:
+            self._breaker(T, br)
+            return
+        br.acct["mem"]["halted"] = None
+        self._rebalance(T, br)
+        br.acct["mem"]["day_eq"] = br.equity()
+
+    def _rebalance(self, T, br):
         sc = self.scores(T)
         n = self.p["n_side"]
         if len(sc) < 2 * n + 2:

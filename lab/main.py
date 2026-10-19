@@ -37,7 +37,8 @@ PARAMS = {
     "news_regime": dict(),
     # Oct 17: 7-day lookback + skip extreme movers (|z| > 2) after the Oct 15 short squeeze; see BACKTEST.md
     # Oct 18: + volatility targeting (shrinks new legs when the book is swinging more than usual)
-    "rel_value": dict(mode="momentum", lookback_d=7, n_side=5, hold_band=3, gross_lev=2.0, max_z=2.0, vol_scale=True),
+    "rel_value": dict(mode="momentum", lookback_d=7, n_side=5, hold_band=3, gross_lev=2.0, max_z=2.0, vol_scale=True,
+                      breaker_pct=5.0, breaker_action="half"),   # Oct 19: hourly circuit breaker, see BACKTEST.md
 }
 
 
@@ -140,11 +141,11 @@ def fetch(coins_1h, coins_4h, errors):
             data[c] = market.candles(c, 24 * 200, "1h")
         except Exception as e:
             errors[f"candles:{c}"] = str(e)[:120]
-    for c in coins_4h:
-        if c in data:
+    for c in coins_4h:                               # relative-value coins: 20 days of hourly candles,
+        if c in data:                                # enough for its 7-day signal and hourly breaker
             continue
         try:
-            data[c] = market.candles(c, 6 * 45, "4h", pause=0.3)
+            data[c] = market.candles(c, 24 * 20, "1h", pause=0.3)
         except Exception as e:
             errors[f"candles:{c}"] = str(e)[:120]
     return {c: v for c, v in data.items() if len(v) > 30}

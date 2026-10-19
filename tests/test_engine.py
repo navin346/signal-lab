@@ -207,6 +207,30 @@ def test_rel_value_skips_extreme_movers():
         assert sum(p["side"] < 0 for p in acct["positions"].values()) == 3   # still a full short book
 
 
+def test_rel_value_circuit_breaker_halves_book():
+    from lab import strategies as S
+    D = 24 * HOUR
+    data = {f"C{i}": [bar(k * HOUR, 1, 1, 1, 1.0 if k < 24 * 10 else 1 + (i - 6) * 0.01) for k in range(24 * 15)]
+            for i in range(12)}
+    data["BTC"] = [bar(k * HOUR, 1, 1, 1, 1.0) for k in range(24 * 15)]
+    rv = S.RelativeValue(list(data), mode="momentum", lookback_d=3, n_side=3, hold_band=1, breaker_pct=5.0)
+    assert rv.every_h == 1
+    rv.prepare(data)
+    br, acct, log = broker()
+    br.px.update({c: 1 + (int(c[1:]) - 6) * 0.01 if c != "BTC" else 1.0 for c in data})
+    rv.step(14 * D, br, {})
+    q0 = {c: p["qty"] for c, p in acct["positions"].items()}
+    assert len(q0) == 6
+    for c, p in acct["positions"].items():          # the short leg squeezes 30%: book down > 5%
+        if p["side"] < 0:
+            br.px[c] *= 1.3
+    rv.step(14 * D + 3 * HOUR, br, {})
+    assert all(abs(p["qty"] - q0[c] / 2) < 1e-9 for c, p in acct["positions"].items())
+    assert acct["mem"]["halted"] and any("circuit breaker" in t["reason"] for t in log)
+    rv.step(14 * D + 4 * HOUR, br, {})              # halted: no second cut the same day
+    assert all(abs(p["qty"] - q0[c] / 2) < 1e-9 for c, p in acct["positions"].items())
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

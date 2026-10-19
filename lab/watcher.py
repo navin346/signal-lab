@@ -162,6 +162,9 @@ class Watcher(Strategy):
                 mem.pop(c, None)
             else:
                 br.tighten(c, sp["stop"])
+                cut = p["qty"] - p["qty0"] * sp["qty"] / sp["qty0"]      # source trimmed (e.g. circuit breaker)
+                if cut > p["qty0"] * 1e-6:
+                    br._exit(c, cut, br.px[c] * (1 - p["side"] * 2e-4), T, f"{bot} reduced its trade")
         for c in list(mem):
             if c not in br.acct["positions"]:
                 mem.pop(c)
