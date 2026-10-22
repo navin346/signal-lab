@@ -52,7 +52,7 @@ def build(top30, held_rv):
 
 BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
 ACTIVE = BOTS + ["watcher", "turbo"]
-TURBO_LEV = 8.0            # Oct 22: the "1% a day" experiment, ~backtest Kelly; see BACKTEST.md before using real money
+TURBO_LEV = 3.0            # Oct 22: 3x (owner's choice; backtest +0.51%/day, -24% max DD). See BACKTEST.md
 DESCRIPTIONS = {
     "watcher": W.Watcher.description, "turbo": W.Turbo.description.replace("~4x", f"~{TURBO_LEV:.0f}x"),
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,

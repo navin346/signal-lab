@@ -206,9 +206,10 @@ The three backtestable bots side by side had:
 |---|---|---|---|---|
 | 1x | $966 | +0.19% | -8.6% | 0 |
 | 2x | $1,714 | +0.36% | -16.6% | 0 |
+| **3x + brake (live from Oct 22)** | **$2,843** | **+0.51%** | **-23.9%** | 0 |
 | 4x (half Kelly) | $4,416 | +0.65% | -30.7% | 0 |
 | 6x | $6,182 | +0.74% | -41.9% | 0 |
-| **8x + brake (live)** | **$10,814** | **+0.91%** | **-49.2%** | 0 |
+| 8x + brake (live Oct 22 for a few hours) | $10,814 | +0.91% | -49.2% | 0 |
 | 8x, no brake | $17,048 | +1.05% | -53.8% | 0 |
 
 The brake halves new copies while the account is 30%+ below its peak.
@@ -216,6 +217,16 @@ The brake halves new copies while the account is 30%+ below its peak.
 **The catch: everything depends on the edge being real.** Backtest edges usually shrink live. In a Monte Carlo where the true edge is half the backtest's:
 - **at 8x:** the median year turned $500 into $649, there was a 14% chance of losing 90%+, and every path saw a 50%+ drawdown;
 - **at 4x:** the median year turned $500 into about $1,090.
+
+Live leverage is 3x, the owner's choice: about a third of the backtest Kelly. That leaves room for the real edge to come in smaller.
+
+What 3x looked like day by day over 339 days:
+- 95 days of +2% or more;
+- 69 days of +0.5% to +2%;
+- 50 roughly flat days;
+- 125 losing days, 67 of them -2% or worse.
+
+The best day was +22%, the worst -9%. Growth comes from good days outnumbering and outsizing bad ones, not from steady gains every day.
 
 So the live paper turbo is a test of whether the edge survives. With real money, start at 4x or less, and move up only after months of live results.
 
