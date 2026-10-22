@@ -52,7 +52,8 @@ def build(top30, held_rv):
 
 BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
 ACTIVE = BOTS + ["watcher", "turbo"]
-TURBO_LEV = 3.0            # Oct 22: 3x (owner's choice; backtest +0.51%/day, -24% max DD). See BACKTEST.md
+TURBO_LEV = 3.0            # owner's choice; Oct 23 risk controls keep the backtest max drawdown under 15%
+TURBO_RISK = dict(brake_dd=1.0, vol_target=0.015, dd_start=0.12, dd_budget=0.25, min_scale=0.2)
 DESCRIPTIONS = {
     "watcher": W.Watcher.description, "turbo": W.Turbo.description.replace("~4x", f"~{TURBO_LEV:.0f}x"),
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
@@ -224,7 +225,7 @@ def tick():
     accts = {s: state["accounts"][s] for s in ACTIVE}
     fund_fn = {c: funding.get(c, 0.0) for c in data}
     tb = W.Turbo(BOTS, {s: state["accounts"][s] for s in BOTS}, state["trades"], list(data),
-                 funding=lambda c, t: funding.get(c), lev=TURBO_LEV)
+                 funding=lambda c, t: funding.get(c), lev=TURBO_LEV, **TURBO_RISK)
     tb.share = 1 / 3                                     # as backtested: each bot at a third, times the leverage
     tb.prepare(data)
     tb.ctx = ctx

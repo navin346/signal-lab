@@ -189,7 +189,8 @@ class Watcher(Strategy):
                     continue
                 if bot != "rel_value":
                     e, m, why = self.expect(bot, p.get("ctx"))
-                qty = p["qty"] * (eq / src_eq) * self.share * m * self.leverage(br, eq)
+                lv = self.leverage(br, eq)
+                qty = p["qty"] * (eq / src_eq) * self.share * m * lv
                 room = max(0.0, eq * self.max_gross - sum(q["qty"] * br.px.get(k, q["entry"])
                                                           for k, q in br.acct["positions"].items()))
                 qty = min(qty, room / br.px[c])
@@ -199,6 +200,8 @@ class Watcher(Strategy):
                              note=why, signal_t=T, track_r=p.get("risk_px") is not None):
                     mem[c] = bot
                     br.acct["positions"][c]["ctx"] = p.get("ctx") or {}
+                    full = getattr(self, "lev", 1.0)                 # size it would have at full leverage
+                    br.acct["positions"][c]["full_qty"] = qty * full / lv if lv else qty
 
     # ------------------------------------------------------------------ reporting
     def report(self, T):
@@ -264,19 +267,40 @@ class Turbo(Watcher):
     the backtest Kelly, plus a brake: while the account is more than 30% below its peak,
     new copies are made at half size. Total exposure is capped at 15x equity."""
     name = "turbo"
-    description = ("Turbo (aggressive growth experiment): copies all bots like the watcher but at ~4x their size "
-                   "(well below the ~8x Kelly-optimal leverage from the backtest). New trades are cut to half size while "
-                   "the account is 30%+ below its peak. Highest return potential and highest risk on the board")
+    description = ("Turbo (growth): copies all bots like the watcher but at ~3x their size. Two safety valves: "
+                   "when the account's own daily swings exceed 1.5% it shrinks every position (open ones too) in "
+                   "proportion, and if it ever falls 12%+ below its peak it keeps shrinking toward 20% size by a 25% "
+                   "drawdown. Backtest: +0.40%/day, worst drawdown -13.9%")
 
-    def __init__(self, *a, lev=4.0, brake_dd=0.30, **kw):
+    def __init__(self, *a, lev=4.0, brake_dd=0.30, dd_budget=None, min_scale=0.0, vol_target=None,
+                 dd_start=0.0, **kw):
         kw.setdefault("learning", False)
         super().__init__(*a, **kw)
         self.lev, self.brake_dd, self.max_gross = lev, brake_dd, 15.0
+        self.dd_budget, self.min_scale, self.vol_target, self.dd_start = dd_budget, min_scale, vol_target, dd_start
 
-    def leverage(self, br, eq):
+    def scale(self, br, eq):
+        """How much of full size to run right now. With a drawdown budget B: full size at a new
+        peak, shrinking in a straight line to min_scale as the drawdown approaches B (so losses
+        slow down the deeper it goes). Without one: the simple brake (half size beyond brake_dd)."""
         mem = br.acct["mem"]
         mem["peak"] = max(mem.get("peak", eq), eq)
-        return self.lev * (0.5 if eq < mem["peak"] * (1 - self.brake_dd) else 1.0)
+        dd = 1 - eq / mem["peak"]
+        sc = 0.5 if dd > self.brake_dd else 1.0
+        if self.dd_budget:                                    # backstop: untouched until dd_start
+            sc = max(self.min_scale, min(1.0, 1 - max(0.0, dd - self.dd_start) / (self.dd_budget - self.dd_start)))
+        if self.vol_target:                                   # daily vol of the account, last 20 days
+            h = mem.get("eq_daily", [])
+            r = [h[i] / h[i - 1] - 1 for i in range(max(1, len(h) - 20), len(h)) if h[i - 1] > 0]
+            if len(r) >= 10:
+                m = sum(r) / len(r)
+                vol = (sum((x - m) ** 2 for x in r) / len(r)) ** 0.5
+                if vol > 0:
+                    sc *= min(1.0, self.vol_target / vol)
+        return sc
+
+    def leverage(self, br, eq):
+        return self.lev * self.scale(br, eq)
 
     @staticmethod
     def maint_rate(coin):
@@ -293,4 +317,18 @@ class Turbo(Watcher):
                 br.close(c, T, "LIQUIDATED (equity below maintenance margin)")
             br.acct["mem"]["liquidations"] = br.acct["mem"].get("liquidations", 0) + 1
             br.acct["mem"]["src"] = {}
+        if T % (24 * HOUR) == 0:
+            h = br.acct["mem"].setdefault("eq_daily", [])
+            h.append(br.equity())
+            del h[:-30]
+        if (self.dd_budget or self.vol_target) and br.acct["positions"]:   # size control also trims what is open
+            sc = self.scale(br, br.equity())
+            src_of = br.acct["mem"].get("src", {})
+            for c, p in list(br.acct["positions"].items()):
+                sp = self.src.get(src_of.get(c), {}).get("positions", {}).get(c)
+                ratio = sp["qty"] / sp["qty0"] if sp else 1.0
+                target = p.get("full_qty", p["qty"]) * sc * ratio
+                if p["qty"] > target * 1.05 and p["qty"] - target > p["qty0"] * 1e-6:
+                    br._exit(c, p["qty"] - target, br.px[c] * (1 - p["side"] * 2e-4), T,
+                             f"risk control: size cut to {sc:.0%}")
         super().step(T, br, ctx)

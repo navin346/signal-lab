@@ -228,6 +228,23 @@ What 3x looked like day by day over 339 days:
 
 The best day was +22%, the worst -9%. Growth comes from good days outnumbering and outsizing bad ones, not from steady gains every day.
 
+#### Oct 23: keeping drawdowns under 15%
+Turbo at 3x, with each way of limiting the worst drawdown:
+
+| setting | $500 became | per day | max drawdown | worst day |
+|---|---|---|---|---|
+| 3x, no control | $2,843 | +0.51% | -23.9% | -9.0% |
+| plain 1.8x leverage | $1,537 | +0.33% | -15.0% | -5.4% |
+| plain 1.5x leverage | $1,299 | +0.28% | -12.7% | -4.6% |
+| 3x, drawdown-scaled from the first loss (15% budget) | $1,131 | +0.24% | -12.0% | -5.6% |
+| 3x + volatility target 2%/day | $2,389 | +0.46% | -15.7% | -6.2% |
+| **3x + volatility target 1.5%/day + backstop (live)** | **$1,907** | **+0.40%** | **-13.9%** | **-6.1%** |
+
+Notes:
+- **Drawdown-scaling from the first loss** keeps drawdowns low but sells near every bottom and misses the rebound. It does worse than simply using less leverage.
+- **Volatility targeting** shrinks all positions, open ones included, when the account's last-20-day daily swings exceed the target. It beat plain lower leverage on both return and drawdown, and stayed under 15% in both halves (TRAIN -13.9%, TEST -12.5%).
+- **The backstop** does nothing until the account is 12% below its peak, then shrinks size toward 20% by a 25% drawdown. It never fired in the backtest. It is insurance for the case where the edge stops working, which fixed leverage cannot handle.
+
 So the live paper turbo is a test of whether the edge survives. With real money, start at 4x or less, and move up only after months of live results.
 
 ## Known biases (read before trusting any number)

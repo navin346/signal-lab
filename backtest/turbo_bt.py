@@ -11,7 +11,8 @@ from lab import engine, strategies as S, watcher as W  # noqa: E402
 from lab.main import PARAMS  # noqa: E402
 
 
-def simulate(path, lev, brake_dd=0.30, share=None, keep_curve=False):
+def simulate(path, lev, brake_dd=0.30, share=None, keep_curve=False, dd_budget=None, min_scale=0.0,
+             vol_target=None, dd_start=0.0):
     ddata, _ = R.load(path, R.DIRECTIONAL)
     rdata, _ = R.load(path, R.TOP30, prefer=("hl_4h",))
     data = dict(rdata)
@@ -24,7 +25,9 @@ def simulate(path, lev, brake_dd=0.30, share=None, keep_curve=False):
     names = [b.name for b in bots]
     accts = {n: engine.new_account(500.0) for n in names + ["turbo"]}
     log, curve = [], []
-    tb = W.Turbo(names, {n: accts[n] for n in names}, log, coins, funding=fund, lev=lev, brake_dd=brake_dd)
+    tb = W.Turbo(names, {n: accts[n] for n in names}, log, coins, funding=fund, lev=lev, brake_dd=brake_dd,
+                  dd_budget=dd_budget, min_scale=min_scale, vol_target=vol_target,
+                  dd_start=dd_start)
     tb.share = share or 1 / len(names)              # 1x = the three bots side by side, each a third
     for b in bots + [tb]:
         b.prepare(data)

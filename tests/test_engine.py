@@ -249,6 +249,20 @@ def test_turbo_levers_brakes_and_liquidates():
     assert not acct["positions"] and "LIQUIDATED" in log[-1]["reason"] and acct["mem"]["liquidations"] == 1
 
 
+def test_turbo_risk_controls_shrink_size():
+    from lab import watcher as W
+    tb = W.Turbo(["src"], {"src": engine.new_account(500.0)}, [], ["BTC"], lev=3.0, brake_dd=1.0,
+                 vol_target=0.015, dd_start=0.12, dd_budget=0.25, min_scale=0.2)
+    br, acct, _ = broker()
+    assert tb.scale(br, 500.0) == 1.0
+    assert tb.scale(br, 450.0) == 1.0                         # 10% down: backstop not active yet
+    assert abs(tb.scale(br, 400.0) - (1 - 0.08 / 0.13)) < 1e-9   # 20% down: shrinking
+    assert tb.scale(br, 300.0) == 0.2                         # 40% down: floor
+    br2, acct2, _ = broker()
+    acct2["mem"]["eq_daily"] = [500 * (1.04 if i % 2 else 0.96) for i in range(20)]   # ~4%/day swings
+    assert 0.3 < tb.scale(br2, 500.0) < 0.45                   # cut to ~1.5/4
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
