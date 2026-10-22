@@ -265,7 +265,7 @@ class Turbo(Watcher):
     new copies are made at half size. Total exposure is capped at 15x equity."""
     name = "turbo"
     description = ("Turbo (aggressive growth experiment): copies all bots like the watcher but at ~4x their size "
-                   "(about half the Kelly-optimal leverage from the backtest). New trades are cut to half size while "
+                   "(well below the ~8x Kelly-optimal leverage from the backtest). New trades are cut to half size while "
                    "the account is 30%+ below its peak. Highest return potential and highest risk on the board")
 
     def __init__(self, *a, lev=4.0, brake_dd=0.30, **kw):
