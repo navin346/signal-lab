@@ -51,9 +51,10 @@ def build(top30, held_rv):
 
 
 BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
-ACTIVE = BOTS + ["watcher"]
+ACTIVE = BOTS + ["watcher", "turbo"]
+TURBO_LEV = 8.0            # Oct 22: the "1% a day" experiment, ~backtest Kelly; see BACKTEST.md before using real money
 DESCRIPTIONS = {
-    "watcher": W.Watcher.description,
+    "watcher": W.Watcher.description, "turbo": W.Turbo.description.replace("~4x", f"~{TURBO_LEV:.0f}x"),
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
     "news_regime": S.NewsRegime.description, "ta_trend": S.TATrend.description,
     "coin_flip": signals.DESCRIPTIONS["coin_flip"], "buy_hold": signals.DESCRIPTIONS["buy_hold"],
@@ -89,6 +90,9 @@ def migrate(state, marks_legacy, now):
             state["accounts"]["watcher"] = engine.new_account(C.START_EQUITY)
             state["watcher_started"] = now
             state["watcher_backfill"] = True
+        if "turbo" not in state["accounts"]:              # + turbo
+            state["accounts"]["turbo"] = engine.new_account(C.START_EQUITY)
+            state["turbo_started"] = now
         return
     retired = {}
     for s in RETIRED + CONTROLS:              # controls restart too, so every bot starts level
@@ -109,7 +113,7 @@ def migrate(state, marks_legacy, now):
         state["accounts"][s] = paper.new_account()
     for s in ACTIVE:
         state["accounts"][s] = engine.new_account(C.START_EQUITY)
-    state["watcher_started"] = now
+    state["watcher_started"] = state["turbo_started"] = now
     state["last_decision"] = None                  # controls re-enter right away
     state.update({"version": 2, "retired": retired, "v2_started": now, "engine_T": now // HOUR * HOUR,
                   "news_items": [], "top30": None, "top30_src": None, "top30_day": None})
@@ -219,7 +223,12 @@ def tick():
                 p.setdefault("ctx", wt.context(s, c, p.get("signal_t") or p["opened"], p["side"]))
     accts = {s: state["accounts"][s] for s in ACTIVE}
     fund_fn = {c: funding.get(c, 0.0) for c in data}
-    engine.run(bots + [wt], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
+    tb = W.Turbo(BOTS, {s: state["accounts"][s] for s in BOTS}, state["trades"], list(data),
+                 funding=lambda c, t: funding.get(c), lev=TURBO_LEV)
+    tb.share = 1 / 3                                     # as backtested: each bot at a third, times the leverage
+    tb.prepare(data)
+    tb.ctx = ctx
+    engine.run(bots + [wt, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
                context_fn=wt.context)
     state["engine_T"] = t_to
     state["watcher_report"] = wt.report(t_to)
@@ -363,6 +372,9 @@ def write(state):
         "positions": {s: state["accounts"][s]["positions"] for s in ACTIVE + CONTROLS},
         "orders": {s: state["accounts"][s].get("orders", {}) for s in ACTIVE},
         "watcher": state.get("watcher_report"), "watcher_started": state.get("watcher_started"),
+        "turbo": {"started": state.get("turbo_started"), "lev": TURBO_LEV,
+                  "peak": state["accounts"]["turbo"]["mem"].get("peak"),
+                  "liquidations": state["accounts"]["turbo"]["mem"].get("liquidations", 0)},
         "marks": state.get("marks", {}), "marks_legacy": state.get("marks_legacy", {}),
         "trades": state["trades"][-500:][::-1], "regimes": state.get("regimes", {}),
         "news_items": state.get("news_items", [])[:100], "analyst_status": state.get("analyst_status"),

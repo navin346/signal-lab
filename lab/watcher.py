@@ -58,6 +58,11 @@ class Watcher(Strategy):
         self.funding = funding or (lambda c, t: 0.0)
         self.d, self.ctx = {}, {}
         self.stats, self.stats_T = {}, None
+        self.share, self.max_gross = BASE_SHARE, 5.0
+
+    def leverage(self, br, eq):
+        """Extra size multiplier (the watcher itself: none)."""
+        return 1.0
 
     # ------------------------------------------------------------------ context
     def prepare(self, data):
@@ -184,8 +189,9 @@ class Watcher(Strategy):
                     continue
                 if bot != "rel_value":
                     e, m, why = self.expect(bot, p.get("ctx"))
-                qty = p["qty"] * (eq / src_eq) * BASE_SHARE * m
-                room = max(0.0, eq * 5 - sum(q["qty"] * br.px.get(k, q["entry"]) for k, q in br.acct["positions"].items()))
+                qty = p["qty"] * (eq / src_eq) * self.share * m * self.leverage(br, eq)
+                room = max(0.0, eq * self.max_gross - sum(q["qty"] * br.px.get(k, q["entry"])
+                                                          for k, q in br.acct["positions"].items()))
                 qty = min(qty, room / br.px[c])
                 if br.market(c, p["side"], qty, T, p["stop"], target=p.get("target"), tp1=p.get("tp1"),
                              tp1_frac=p.get("tp1_frac", 0.5), be_after_tp1=p.get("be", True),
@@ -245,3 +251,46 @@ def _frame(bars, hours):
     from lab.strategies import frame
     return frame(bars, hours)
 
+
+class Turbo(Watcher):
+    """Turbo: the "grow a small account fast" experiment.
+
+    Same copies as the watcher (equal split, no learning: learning did not help in the
+    backtest), but levered. From first principles, the fastest long-run growth for an edge
+    with mean m and variance v per day comes at leverage m / v (the Kelly fraction); our
+    three-bot portfolio's backtest put that near 8x, which would have made ~1% a day with a
+    -76% drawdown. Real edges are usually smaller than backtests show, and betting above
+    the true Kelly leverage shrinks growth and invites ruin, so this runs at about half of
+    the backtest Kelly, plus a brake: while the account is more than 30% below its peak,
+    new copies are made at half size. Total exposure is capped at 15x equity."""
+    name = "turbo"
+    description = ("Turbo (aggressive growth experiment): copies all bots like the watcher but at ~4x their size "
+                   "(about half the Kelly-optimal leverage from the backtest). New trades are cut to half size while "
+                   "the account is 30%+ below its peak. Highest return potential and highest risk on the board")
+
+    def __init__(self, *a, lev=4.0, brake_dd=0.30, **kw):
+        kw.setdefault("learning", False)
+        super().__init__(*a, **kw)
+        self.lev, self.brake_dd, self.max_gross = lev, brake_dd, 15.0
+
+    def leverage(self, br, eq):
+        mem = br.acct["mem"]
+        mem["peak"] = max(mem.get("peak", eq), eq)
+        return self.lev * (0.5 if eq < mem["peak"] * (1 - self.brake_dd) else 1.0)
+
+    @staticmethod
+    def maint_rate(coin):
+        """Approximate Hyperliquid maintenance margin (half the initial margin at max leverage)."""
+        return {"BTC": 0.0125, "ETH": 0.02, "SOL": 0.025, "XRP": 0.025}.get(coin, 0.05)
+
+    def step(self, T, br, ctx):
+        """Liquidation check first: on Hyperliquid (cross margin) the whole account is closed
+        when equity falls below the maintenance margin of everything open."""
+        eq = br.equity()
+        maint = sum(p["qty"] * br.px.get(c, p["entry"]) * self.maint_rate(c) for c, p in br.acct["positions"].items())
+        if br.acct["positions"] and eq < maint:
+            for c in list(br.acct["positions"]):
+                br.close(c, T, "LIQUIDATED (equity below maintenance margin)")
+            br.acct["mem"]["liquidations"] = br.acct["mem"].get("liquidations", 0) + 1
+            br.acct["mem"]["src"] = {}
+        super().step(T, br, ctx)

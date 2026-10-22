@@ -231,6 +231,24 @@ def test_rel_value_circuit_breaker_halves_book():
     assert all(abs(p["qty"] - q0[c] / 2) < 1e-9 for c, p in acct["positions"].items())
 
 
+def test_turbo_levers_brakes_and_liquidates():
+    from lab import watcher as W
+    src = engine.new_account(500.0)
+    tb = W.Turbo(["src"], {"src": src}, [], ["BTC"], lev=8.0)
+    br, acct, log = broker()
+    assert tb.leverage(br, 500.0) == 8.0
+    assert tb.leverage(br, 340.0) == 4.0                  # 32% below the peak: brake halves new copies
+    br.market("BTC", 1, 30.0, 0, stop=1.0)                # $3,000 of BTC on a $500 account
+    src["positions"]["BTC"] = dict(acct["positions"]["BTC"])   # ...copied from a source bot
+    acct["mem"]["src"] = {"BTC": "src"}
+    br.px["BTC"] = 85.0                                    # -$450: equity ~$48 < maintenance ~$32? not yet
+    tb.step(HOUR, br, {})
+    assert acct["positions"]
+    br.px["BTC"] = 84.0                                    # equity ~$18 < maintenance (30 * 84 * 1.25% = $31.5)
+    tb.step(2 * HOUR, br, {})
+    assert not acct["positions"] and "LIQUIDATED" in log[-1]["reason"] and acct["mem"]["liquidations"] == 1
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

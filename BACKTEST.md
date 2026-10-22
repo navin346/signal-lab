@@ -192,6 +192,33 @@ What did help is combining the bots: an equal split had about half the drawdown 
 
 The live watcher therefore stays close to the equal split, and only tilts when a pattern has 30+ trades behind it. It records the conditions from day one, so in a few months there will be enough live data to judge whether learning adds anything. Reproduce with `python -m backtest.watcher_bt --data CACHE`.
 
+### turbo (Oct 22): can leverage get to 1% a day?
+**First principles.** For an edge with average daily return m and daily variance v, long-run growth is fastest at leverage ≈ m / v (the Kelly fraction). Above that, growth falls and ruin risk rises.
+
+The three backtestable bots side by side had:
+- Sharpe about 2.6;
+- daily mean +0.22% and daily volatility 1.63%;
+- Kelly leverage about 8x.
+
+**Engine backtest** (real fees, funding, every trade, a liquidation check on hourly closes). Turbo copies the three bots, each at a third, times the leverage:
+
+| leverage | $500 became (339 days) | per day | max drawdown | liquidations |
+|---|---|---|---|---|
+| 1x | $966 | +0.19% | -8.6% | 0 |
+| 2x | $1,714 | +0.36% | -16.6% | 0 |
+| 4x (half Kelly) | $4,416 | +0.65% | -30.7% | 0 |
+| 6x | $6,182 | +0.74% | -41.9% | 0 |
+| **8x + brake (live)** | **$10,814** | **+0.91%** | **-49.2%** | 0 |
+| 8x, no brake | $17,048 | +1.05% | -53.8% | 0 |
+
+The brake halves new copies while the account is 30%+ below its peak.
+
+**The catch: everything depends on the edge being real.** Backtest edges usually shrink live. In a Monte Carlo where the true edge is half the backtest's:
+- **at 8x:** the median year turned $500 into $649, there was a 14% chance of losing 90%+, and every path saw a 50%+ drawdown;
+- **at 4x:** the median year turned $500 into about $1,090.
+
+So the live paper turbo is a test of whether the edge survives. With real money, start at 4x or less, and move up only after months of live results.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.
