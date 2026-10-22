@@ -259,7 +259,10 @@ def test_turbo_risk_controls_shrink_size():
     assert abs(tb.scale(br, 400.0) - (1 - 0.08 / 0.13)) < 1e-9   # 20% down: shrinking
     assert tb.scale(br, 300.0) == 0.2                         # 40% down: floor
     br2, acct2, _ = broker()
-    acct2["mem"]["eq_daily"] = [500 * (1.04 if i % 2 else 0.96) for i in range(20)]   # ~4%/day swings
+    h = [500.0]
+    for i in range(20):
+        h.append(h[-1] * (1.04 if i % 2 else 0.96))          # +-4% daily swings
+    acct2["mem"]["eq_daily"] = h
     assert 0.3 < tb.scale(br2, 500.0) < 0.45                   # cut to ~1.5/4
 
 
