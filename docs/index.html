@@ -86,7 +86,8 @@
   <div class="card">
     <h2>Scoreboard (live paper trading)</h2>
     <p class="note">Every bot started with $500 (virtual) on <span id="v2start"></span>. A bot is worth real money only if it
-      beats <b>both controls</b> over 100+ trades. Until then, treat every number as noise.</p>
+      beats <b>both controls</b> over 100+ trades. Until then, treat every number as noise.
+      Equity = $500 + profit from closed trades + profit on positions still open (which can still change).</p>
     <div class="scroll"><table id="score"></table></div>
     <details><summary>How each bot trades</summary><div class="scroll"><table id="how"></table></div></details>
   </div>
@@ -223,10 +224,11 @@ function render(d){
   $("tiles").replaceChildren(...tiles.map(([v,l]) => { const t=el("div",null,"tile"); t.append(el("b", String(v)), el("span", l)); return t; }));
 
   const btm = BT?.metrics || {};
-  fill("score", ["Bot","Equity","Return","Trades","Win rate","Avg P&L","Max drawdown","Open","Beats both controls?","Backtest TEST half"],
+  const usd = v => v==null ? "–" : {t: (v<0?"-$":"+$")+fmt(Math.abs(v)), c: v>0?"pos":v<0?"neg":""};
+  fill("score", ["Bot","Equity","Return","Profit from closed trades","Profit on open positions","Closed trades","Win rate","Avg P&L","Max drawdown","Open positions","Beats both controls?","Backtest TEST half"],
     ranked.map(s => { const x=st[s]; const beats = !CONTROLS.has(s) && x.equity>st.coin_flip.equity && x.equity>st.buy_hold.equity;
       const bt = btm[s]?.test;
-      return [keyFor(s), "$"+fmt(x.equity), pc(x.return_pct), x.trades, x.win_pct==null?"–":fmt(x.win_pct,1)+"%",
+      return [keyFor(s), "$"+fmt(x.equity), pc(x.return_pct), usd(x.closed_pnl), usd(x.open_pnl), x.trades, x.win_pct==null?"–":fmt(x.win_pct,1)+"%",
         x.avg_pnl==null?"–":sgn(x.avg_pnl,2), {t: fmt(x.max_dd_pct,1)+"%", c: x.max_dd_pct<0?"neg":""}, x.open,
         CONTROLS.has(s) ? {t:"control", c:"muted"} : x.trades < MIN ? {t:"too early ("+x.trades+"/"+MIN+")", c:"muted"}
           : beats ? {t:"✓ yes, so far", c:"pos"} : {t:"✗ no", c:"neg"},

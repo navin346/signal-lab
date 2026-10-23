@@ -135,6 +135,8 @@ def stats(state):
                   "trades": len(tr), "win_pct": round(sum(t["pnl"] > 0 for t in tr) / len(tr) * 100, 1) if tr else None,
                   "avg_pnl": round(sum(t["pnl"] for t in tr) / len(tr), 3) if tr else None,
                   "max_dd_pct": round(dd * 100, 2), "open": len(acct["positions"]),
+                  "closed_pnl": round(sum(t["pnl"] for t in tr), 2),
+                  "open_pnl": round(eq - C.START_EQUITY - sum(t["pnl"] for t in tr), 2),   # equity = start + closed + open
                   "control": s in CONTROLS, "description": DESCRIPTIONS[s]}
     return out
 
