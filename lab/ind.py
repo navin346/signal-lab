@@ -184,3 +184,21 @@ def internal_structure(bars, n=2):
             it, flip, lvl, last_l = -1, -1, last_l, None
         out.append({"itrend": it, "flip": flip, "lvl": lvl})
     return out
+
+
+def rsi(closes, n=14):
+    """Wilder RSI; None until n closes are known."""
+    out, g, l = [None] * len(closes), 0.0, 0.0
+    for i in range(1, len(closes)):
+        ch = closes[i] - closes[i - 1]
+        up, dn = max(ch, 0.0), max(-ch, 0.0)
+        if i <= n:
+            g += up / n
+            l += dn / n
+            if i == n:
+                out[i] = 100 - 100 / (1 + g / l) if l else 100.0
+        else:
+            g = (g * (n - 1) + up) / n
+            l = (l * (n - 1) + dn) / n
+            out[i] = 100 - 100 / (1 + g / l) if l else 100.0
+    return out

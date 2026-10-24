@@ -266,6 +266,27 @@ Notes:
 
 So the live paper turbo is a test of whether the edge survives. With real money, start at 4x or less, and move up only after months of live results.
 
+### Oct 24: can we raise return AND cut drawdown? (tested, nothing beat the live setup)
+Baseline: Turbo at 3x with volatility control, $500 → $1,907 over the full year, worst drawdown -13.9%, Sharpe 3.35 (engine).
+
+**1. Timing ("sit a bot out after a bad stretch").** Rule: trade a bot only if its last N days were positive, N from 5 to 60.
+- Every version made less money, and most had deeper drawdowns.
+- For example, the 20-day gate: -17.7% drawdown vs -15.3%, $1,490 vs $1,754, on a daily-return version of the same test.
+- Inverse-volatility weights (give calmer bots more money) also did not help.
+- Losing stretches are not predictable from a bot's recent results.
+
+**2. More coins for the trend bot** (all top 30 instead of 15 markets): +25% vs +43%.
+
+**3. New, unrelated edges.** The bots are already nearly independent: daily correlations -0.02 to 0.22. Two candidates were built and tested:
+- **Snap-back:** 1-hour mean reversion on the 10 most liquid coins, outside strong trends. +21% at 1.5% risk, Sharpe 1.1, 56 trades, correlation with the bots about 0.
+- **Crowd fade:** bet against funding-rate extremes. About 0% over the full year, but correlation about -0.5 (a hedge).
+
+Added to Turbo, they gave $1,746 / $1,813 / $1,615 (snap-back, crowd fade, both), with drawdowns -12.9% / -12.8% / -14.1%. No real improvement, so neither went live. The code stays in `lab/strategies.py` (`SnapBack`, `CrowdFade`) for later.
+
+*Correction:* a first blend test showed +0.60%/day with both added. It was wrong: one coin's data ended early, which cut that test to Nov-Jun. Always check the window.
+
+**What a 1%-a-day target with a drawdown under 15% needs.** Roughly a Sharpe of 6-8; Turbo is about 3.3. The way there is more independent edges, each passing the full-year engine test. Today's two candidates did not.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

@@ -9,6 +9,8 @@ the future (indicator values at a candle use only that candle and earlier ones).
                (residual/reversal, carry modes implemented and tested; they lost).
   news_regime  AI news analyst decides whether/which way; ADX regime decides stop/target/hold.
   ta_trend     Trend following on 4H: Donchian breakout (or EMA crossover), ADX filter, ATR trail.
+  snapback     1H mean reversion on the 10 most liquid coins, only outside strong trends.
+  crowd_fade   Bets against an extremely crowded side (funding far from its own 30-day norm).
 
 Live parameters are set in lab/main.py; BACKTEST.md explains how each was chosen."""
 import bisect
@@ -543,3 +545,98 @@ class RelativeValue(Strategy):
                         held_l += 1
                     else:
                         held_s += 1
+
+
+# =========================================================================== snap-back (Oct 24)
+class SnapBack(Strategy):
+    name, every_h = "snapback", 1
+    description = ("Snap-back: on the 10 most liquid coins, when the 1-hour chart is stretched (RSI below 15 or above "
+                   "85 and price beyond a 2.5-sigma band) and the 4-hour trend is not strong (ADX under 30), bet on a "
+                   "partial snap back to the 20-hour average; 1.5 ATR stop, out within 12 hours, 1.5% risk")
+
+    def __init__(self, coins, rsi_lo=15, rsi_hi=85, k=2.5, adx_max=30, risk_pct=1.5, stop_atr=1.5, hold_h=12):
+        self.coins = coins
+        self.p = dict(rsi_lo=rsi_lo, rsi_hi=rsi_hi, k=k, adx_max=adx_max, risk_pct=risk_pct, stop_atr=stop_atr,
+                      hold_h=hold_h)
+        self.d = {}
+
+    def prepare(self, data):
+        for c in self.coins:
+            if c not in data or len(data[c]) < 500 or _bars_h(data[c]) != 1:
+                continue
+            h1, h4 = frame(data[c], 1), frame(data[c], 4)
+            cl = [b["c"] for b in h1.b]
+            self.d[c] = {"h1": h1, "h4": h4, "rsi": ind.rsi(cl), "mid": ind.sma(cl, 20), "sd": ind.stdev(cl, 20),
+                         "atr": ind.atr(h1.b, 14), "adx": ind.adx(h4.b, 14)[0]}
+
+    def step(self, T, br, ctx):
+        for c, d in self.d.items():
+            i = d["h1"].closes_at(T)
+            if i is None or i < 50 or br.position(c) or c not in br.px or d["sd"][i] is None or not d["atr"][i]:
+                continue
+            j = d["h4"].at(T)
+            if j < 20 or (d["adx"][j] or 99) > self.p["adx_max"]:
+                continue
+            b, r = d["h1"].b[i], d["rsi"][i]
+            band = self.p["k"] * d["sd"][i]
+            side = 1 if r is not None and r < self.p["rsi_lo"] and b["c"] < d["mid"][i] - band else \
+                -1 if r is not None and r > self.p["rsi_hi"] and b["c"] > d["mid"][i] + band else 0
+            if not side:
+                continue
+            stop = b["c"] - side * self.p["stop_atr"] * d["atr"][i]
+            qty = br.size_for_risk(c, b["c"], stop, self.p["risk_pct"])
+            br.market(c, side, qty, T, stop, target=d["mid"][i], time_stop=T + self.p["hold_h"] * HOUR,
+                      setup="snap-back", signal_t=T,
+                      note=f"1H RSI {r:.0f}, {abs(b['c'] - d['mid'][i]) / d['sd'][i]:.1f} sigma from the 20h average, 4H ADX {d['adx'][j]:.0f}")
+
+
+# =========================================================================== crowd fade (Oct 24)
+class CrowdFade(Strategy):
+    name, every_h = "crowd_fade", 4
+    description = ("Crowd fade: on the top-30 coins, when the last 24h of funding is more than 2.5 standard deviations "
+                   "away from the coin's own 30-day norm (one side very crowded) and price has already run 5%+ their "
+                   "way over 3 days, take the other side; 2 ATR stop, 3 ATR target, out within 3 days. Tends to win "
+                   "when the other bots lose")
+
+    def __init__(self, coins, funding=None, z=2.5, run_pct=5.0, risk_pct=0.75, stop_atr=2.0, tgt_atr=3.0, hold_d=3):
+        self.coins, self.funding = coins, funding or (lambda c, t: None)
+        self.p = dict(z=z, run_pct=run_pct, risk_pct=risk_pct, stop_atr=stop_atr, tgt_atr=tgt_atr, hold_d=hold_d)
+        self.d = {}
+
+    def prepare(self, data):
+        for c in self.coins:
+            if c in data and len(data[c]) > 40:
+                h4 = frame(data[c], 4)
+                self.d[c] = {"h4": h4, "atr": ind.atr(h4.b, 14)}
+
+    def zscore(self, c, T):
+        f24 = [self.funding(c, T - k * HOUR) for k in range(1, 25)]
+        days = [[self.funding(c, T - (k + m) * HOUR) for m in range(24)] for k in range(24, 24 * 30, 24)]
+        if any(x is None for x in f24):
+            return None
+        means = [sum(x for x in dd if x is not None) / max(1, sum(x is not None for x in dd)) for dd in days
+                 if sum(x is not None for x in dd) >= 12]
+        if len(means) < 10:
+            return None
+        mu = sum(means) / len(means)
+        sd = math.sqrt(sum((x - mu) ** 2 for x in means) / len(means))
+        return (sum(f24) / 24 - mu) / sd if sd > 0 else None
+
+    def step(self, T, br, ctx):
+        for c, d in self.d.items():
+            i = d["h4"].closes_at(T)
+            if i is None or i < 30 or br.position(c) or c not in br.px or not d["atr"][i]:
+                continue
+            z = self.zscore(c, T)
+            if z is None:
+                continue
+            run = (d["h4"].b[i]["c"] / d["h4"].b[i - 18]["c"] - 1) * 100
+            side = -1 if z > self.p["z"] and run > self.p["run_pct"] else 1 if z < -self.p["z"] and run < -self.p["run_pct"] else 0
+            if not side:
+                continue
+            px, a = d["h4"].b[i]["c"], d["atr"][i]
+            stop = px - side * self.p["stop_atr"] * a
+            qty = br.size_for_risk(c, px, stop, self.p["risk_pct"])
+            br.market(c, side, qty, T, stop, target=px + side * self.p["tgt_atr"] * a,
+                      time_stop=T + self.p["hold_d"] * DAY, setup="crowd fade", signal_t=T,
+                      note=f"funding z-score {z:+.1f} ({'longs' if z > 0 else 'shorts'} crowded), price {run:+.1f}% over 3 days")

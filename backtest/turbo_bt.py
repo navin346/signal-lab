@@ -11,8 +11,11 @@ from lab import engine, strategies as S, watcher as W  # noqa: E402
 from lab.main import PARAMS  # noqa: E402
 
 
+SNAP_COINS = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE", "LINK", "ADA", "AVAX", "SUI"]
+
+
 def simulate(path, lev, brake_dd=0.30, share=None, keep_curve=False, dd_budget=None, min_scale=0.0,
-             vol_target=None, dd_start=0.0):
+             vol_target=None, dd_start=0.0, extra=False):
     ddata, _ = R.load(path, R.DIRECTIONAL)
     rdata, _ = R.load(path, R.TOP30, prefer=("hl_4h",))
     data = dict(rdata)
@@ -22,13 +25,18 @@ def simulate(path, lev, brake_dd=0.30, share=None, keep_curve=False, dd_budget=N
     rv = {k: v for k, v in PARAMS["rel_value"].items() if k not in ("breaker_pct", "breaker_action")}
     bots = [S.MarketStructure(list(ddata), **PARAMS["ms_struct"]), S.RelativeValue(list(rdata), **rv),
             S.TATrend(list(ddata), **PARAMS["ta_trend"])]
+    extra = {"snapback", "crowd_fade"} if extra is True else set(extra or ())
+    if "snapback" in extra:                      # Oct 24 candidates
+        bots.append(S.SnapBack([c for c in SNAP_COINS if c in ddata], **PARAMS.get("snapback", {})))
+    if "crowd_fade" in extra:
+        bots.append(S.CrowdFade(list(rdata), funding=fund, **PARAMS.get("crowd_fade", {})))
     names = [b.name for b in bots]
     accts = {n: engine.new_account(500.0) for n in names + ["turbo"]}
     log, curve = [], []
     tb = W.Turbo(names, {n: accts[n] for n in names}, log, coins, funding=fund, lev=lev, brake_dd=brake_dd,
                   dd_budget=dd_budget, min_scale=min_scale, vol_target=vol_target,
                   dd_start=dd_start)
-    tb.share = share or 1 / len(names)              # 1x = the three bots side by side, each a third
+    tb.share = share or 1 / 3                       # each bot at a third, times the leverage
     for b in bots + [tb]:
         b.prepare(data)
     t0, t1 = R.span(ddata, 60)
@@ -41,6 +49,12 @@ def simulate(path, lev, brake_dd=0.30, share=None, keep_curve=False, dd_budget=N
     res["per_day"] = round(((eq[-1] / eq[0]) ** (1 / days) - 1) * 100, 3) if eq[-1] > 0 else -100
     res["final"] = round(eq[-1], 2)
     res["liquidations"] = accts["turbo"]["mem"].get("liquidations", 0)
+    res["bots"] = {n: R.metrics(curve, log, n, t0, t1) for n in names}
+    eqs = [p["eq"]["turbo"] for p in curve]
+    rets = [eqs[i] / eqs[i - 1] - 1 for i in range(1, len(eqs))]
+    res["days_up1"] = sum(x >= 0.01 for x in rets) / len(rets) * 100
+    res["days_red"] = sum(x <= -0.003 for x in rets) / len(rets) * 100
+    res["worst_day"] = min(rets) * 100
     if keep_curve:
         res["curve"] = [{"t": p["t"], "eq": p["eq"]["turbo"]} for p in curve]
     return res
