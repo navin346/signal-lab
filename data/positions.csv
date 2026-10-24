@@ -1,0 +1,54 @@
+strategy,asset,hyperliquid_market,side,setup,opened_utc,entry_price,stop_price,partial_target,target_price,mark_now,funding_usd_so_far,note
+coin_flip,BTC,BTC,short,,2026-10-23 01:28:55,81471,83100.4,,79841.6,80262,0.1053,
+coin_flip,ETH,ETH,short,,2026-10-23 01:28:55,2390.62,2438.43,,2342.81,2349.6,0.0548,
+coin_flip,GOLD,xyz:GOLD,short,,2026-10-23 01:28:55,4015.2,4095.5,,3934.89,3986.7,0.0834,
+coin_flip,SOL,SOL,long,,2026-10-24 00:39:46,102.06,100.019,,104.102,100.63,-0.0086,
+coin_flip,OIL,xyz:CL,long,,2026-10-24 00:39:46,103.721,101.646,,105.795,103.59,-0.0259,
+coin_flip,NASDAQ,xyz:XYZ100,short,,2026-10-24 00:39:46,28955.2,29534.3,,28376.1,28915,-0.0222,
+buy_hold,BTC,BTC,long,,2026-10-23 01:28:55,81503.6,79873.5,,83133.7,80262,-0.0983,
+buy_hold,ETH,ETH,long,,2026-10-23 01:28:55,2391.58,2343.75,,2439.41,2349.6,-0.0511,
+buy_hold,GOLD,xyz:GOLD,long,,2026-10-23 01:28:55,4016.8,3936.47,,4097.14,3986.7,-0.0778,
+buy_hold,NASDAQ,xyz:XYZ100,long,,2026-10-23 01:28:55,29005.8,28425.7,,29585.9,28915,-0.0207,
+buy_hold,SOL,SOL,long,,2026-10-24 00:39:46,102.06,100.019,,104.102,100.63,-0.0077,
+buy_hold,OIL,xyz:CL,long,,2026-10-24 00:39:46,103.721,101.646,,105.795,103.59,-0.0232,
+ms_struct,BNB,BNB,long,CHoCH pullback,2026-10-15 15:00:00,729.896,703.219,,810,728.34,-0.2046,"4H uptrend since BOS, 1H CHoCH at 723.39, pullback extreme 708.43"
+ms_struct,BTC,BTC,long,CHoCH pullback,2026-10-17 08:00:00,81712.3,80384.9,,87471,80262,-0.53,"4H uptrend since BOS, 1H CHoCH at 81648, pullback extreme 80772"
+ms_struct,XRP,XRP,long,CHoCH pullback,2026-10-18 23:00:00,1.30126,1.24548,,1.7044,1.2764,-0.1902,"4H uptrend since BOS, 1H CHoCH at 1.2768, pullback extreme 1.2554"
+ms_struct,SOL,SOL,short,CHoCH pullback,2026-10-22 00:00:00,106.909,110.054,,100.34,100.63,0.1001,"4H downtrend since BOS, 1H CHoCH at 107.36, pullback extreme 109.19"
+rel_value,XMR,XMR,long,RV momentum,2026-10-13 00:00:00,527.415,263.655,,,595.89,-0.412,score -0.0153
+rel_value,BCH,BCH,long,RV momentum,2026-10-16 00:00:00,278.246,139.095,,,273.65,-0.1619,score -0.0471
+rel_value,AVAX,AVAX,short,RV momentum,2026-10-21 00:00:00,9.74595,14.6218,,,8.7952,0.0004,score +0.0474
+rel_value,HBAR,HBAR,short,RV momentum,2026-10-22 00:00:00,0.0838492,0.125799,,,0.076157,0.0688,score +0.0081
+rel_value,BNB,BNB,long,RV momentum,2026-10-23 00:00:00,731.226,365.54,,,728.34,-0.0193,score -0.0025
+rel_value,ONDO,ONDO,short,RV momentum,2026-10-23 00:00:00,0.428414,0.64275,,,0.40309,-0.0264,score +0.0900
+rel_value,TAO,TAO,short,RV momentum,2026-10-23 00:00:00,257.528,386.37,,,247.39,0.028,score +0.0798
+rel_value,ZEC,ZEC,long,RV momentum,2026-10-24 00:00:00,1182.34,591.05,,,1142.1,-0.0039,score -0.0284
+rel_value,ENA,ENA,long,RV momentum,2026-10-24 00:00:00,0.19917,0.099565,,,0.18697,-0.0136,score -0.0018
+rel_value,GRAM,GRAM,short,RV momentum,2026-10-24 00:00:00,1.21846,1.82805,,,1.235,-0.0825,score +0.1046
+ta_trend,xyz:GOLD,xyz:GOLD,short,donchian 50/200 cross,2026-10-22 12:00:00,4059.99,4036.09,,,3986.7,0.2156,ADX 24
+ta_trend,xyz:CL,xyz:CL,long,donchian 50/200 cross,2026-10-23 16:00:00,103.001,101.069,,,103.59,-0.0976,ADX 24
+ta_trend,HYPE,HYPE,short,donchian 50/200 cross,2026-10-24 12:00:00,75.5669,78.5716,,,75.552,-0.0026,ADX 22
+watcher,BNB,BNB,long,copy of ms_struct: CHoCH pullback,2026-10-15 15:00:00,729.896,703.219,,810,728.34,-0.0528,learning (3/20 trades): copied at 1x
+watcher,BCH,BCH,long,copy of rel_value: RV momentum,2026-10-16 00:00:00,278.246,139.095,,,273.65,-0.0416,learning (8/20 trades): copied at 1x
+watcher,BTC,BTC,long,copy of ms_struct: CHoCH pullback,2026-10-17 08:00:00,81712.3,80384.9,,87471,80262,-0.1343,learning (4/20 trades): copied at 1x
+watcher,XRP,XRP,long,copy of ms_struct: CHoCH pullback,2026-10-18 23:00:00,1.30126,1.24548,,1.7044,1.2764,-0.0478,learning (6/20 trades): copied at 1x
+watcher,AVAX,AVAX,short,copy of rel_value: RV momentum,2026-10-21 00:00:00,9.74595,14.6218,,,8.7952,0.0001,expected -0.16R (bot -0.16R): x0.84
+watcher,SOL,SOL,short,copy of ms_struct: CHoCH pullback,2026-10-22 00:00:00,106.909,110.054,,100.34,100.63,0.0241,learning (6/20 trades): copied at 1x
+watcher,HBAR,HBAR,short,copy of rel_value: RV momentum,2026-10-22 00:00:00,0.0838492,0.125799,,,0.076157,0.0153,expected -0.17R (bot -0.17R): x0.83
+watcher,xyz:GOLD,xyz:GOLD,short,copy of ta_trend: donchian 50/200 cross,2026-10-22 12:00:00,4059.99,4036.09,,,3986.7,0.0546,learning (2/20 trades): copied at 1x
+watcher,ONDO,ONDO,short,copy of rel_value: RV momentum,2026-10-23 00:00:00,0.428414,0.64275,,,0.40309,-0.0058,expected -0.18R (bot -0.18R): x0.82
+watcher,TAO,TAO,short,copy of rel_value: RV momentum,2026-10-23 00:00:00,257.528,386.37,,,247.39,0.0062,expected -0.18R (bot -0.18R): x0.82
+watcher,xyz:CL,xyz:CL,long,copy of ta_trend: donchian 50/200 cross,2026-10-23 16:00:00,103.001,101.069,,,103.59,-0.0245,learning (2/20 trades): copied at 1x
+watcher,ZEC,ZEC,long,copy of rel_value: RV momentum,2026-10-24 00:00:00,1182.34,591.05,,,1142.1,-0.0009,expected -0.20R (bot -0.20R): x0.80
+watcher,ENA,ENA,long,copy of rel_value: RV momentum,2026-10-24 00:00:00,0.19917,0.099565,,,0.18697,-0.003,expected -0.20R (bot -0.20R): x0.80
+watcher,GRAM,GRAM,short,copy of rel_value: RV momentum,2026-10-24 00:00:00,1.21846,1.82805,,,1.235,-0.0181,expected -0.20R (bot -0.20R): x0.80
+watcher,HYPE,HYPE,short,copy of ta_trend: donchian 50/200 cross,2026-10-24 12:00:00,75.5669,78.5716,,,75.552,-0.0006,learning (2/20 trades): copied at 1x
+turbo,xyz:GOLD,xyz:GOLD,short,copy of ta_trend: donchian 50/200 cross,2026-10-22 12:00:00,4059.99,4036.09,,,3986.7,0.2203,learning (2/20 trades): copied at 1x
+turbo,BNB,BNB,long,copy of rel_value: RV momentum,2026-10-23 00:00:00,731.226,365.54,,,728.34,-0.021,learning (31/20 trades): copied at 1x
+turbo,ONDO,ONDO,short,copy of rel_value: RV momentum,2026-10-23 00:00:00,0.428414,0.64275,,,0.40309,-0.0288,learning (31/20 trades): copied at 1x
+turbo,TAO,TAO,short,copy of rel_value: RV momentum,2026-10-23 00:00:00,257.528,386.37,,,247.39,0.0304,learning (31/20 trades): copied at 1x
+turbo,xyz:CL,xyz:CL,long,copy of ta_trend: donchian 50/200 cross,2026-10-23 16:00:00,103.001,101.069,,,103.59,-0.0997,learning (2/20 trades): copied at 1x
+turbo,ZEC,ZEC,long,copy of rel_value: RV momentum,2026-10-24 00:00:00,1182.34,591.05,,,1142.1,-0.0044,learning (35/20 trades): copied at 1x
+turbo,ENA,ENA,long,copy of rel_value: RV momentum,2026-10-24 00:00:00,0.19917,0.099565,,,0.18697,-0.0152,learning (35/20 trades): copied at 1x
+turbo,GRAM,GRAM,short,copy of rel_value: RV momentum,2026-10-24 00:00:00,1.21846,1.82805,,,1.235,-0.0922,learning (35/20 trades): copied at 1x
+turbo,HYPE,HYPE,short,copy of ta_trend: donchian 50/200 cross,2026-10-24 12:00:00,75.5669,78.5716,,,75.552,-0.0043,learning (2/20 trades): copied at 1x
