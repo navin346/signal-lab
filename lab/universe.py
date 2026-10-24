@@ -22,6 +22,11 @@ UA = {"User-Agent": "Mozilla/5.0 (signal-lab paper bot)"}
 
 
 def label(coin):
+    if coin.startswith("hlc:"):                       # carry legs
+        return label(coin[4:]) + " (Hyperliquid)"
+    if coin.startswith("ast:"):
+        from lab.carry import norm_sym
+        return norm_sym(coin[4:])[0] + " (Aster)"
     return LABELS.get(coin, coin)
 
 

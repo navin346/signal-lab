@@ -266,6 +266,81 @@ def test_turbo_risk_controls_shrink_size():
     assert 0.3 < tb.scale(br2, 500.0) < 0.45                   # cut to ~1.5/4
 
 
+def _carry_setup(hl_px=100.0, ast_px=100.2):
+    from lab import carry
+    book = carry.FundingBook()
+    book.hl["X"] = {h * HOUR: 0.0 for h in range(400)}                     # Hyperliquid: zero funding
+    book.ast["X"] = [(h * HOUR, 0.0003, 8.0) for h in range(0, 400, 8)]    # Aster: 0.03% per 8h = 32.85% a year
+    pairs = [{"sym": "X", "hl": "hlc:X", "ast": "ast:X", "hl_mult": 1.0, "ast_mult": 1.0}]
+    acct, log = engine.new_account(500.0), []
+    br = engine.Broker("carry", acct, {"hlc:X": hl_px, "ast:X": ast_px}, log)
+    return carry.FundingCarry(pairs, book), book, br, acct, log
+
+
+def test_carry_opens_a_hedged_pair_on_a_big_gap():
+    from lab import carry
+    bot, book, br, acct, _ = _carry_setup()
+    T = 216 * HOUR                                                         # a rebalance hour (every 72h)
+    assert abs(book.mean_gap("X", T, 168) - 0.0003 * 8760 / 8 * 100) < 1e-9
+    assert book.mean_gap("X", 100 * HOUR, 168) is None                     # not 80% of the window yet
+    bot.step(T, br, {})
+    a, b = acct["positions"]["hlc:X"], acct["positions"]["ast:X"]
+    assert a["side"] == 1 and b["side"] == -1                              # Aster pays more: short Aster, long HL
+    assert abs(a["qty"] * a["entry"] - 150) < 1 and abs(b["qty"] * b["entry"] - 150) < 1   # $500 x 3 / 10 a leg
+    assert acct["mem"]["pairs"]["X"]["dir"] == 1
+    assert carry.norm_sym("1000PEPEUSDT") == ("PEPE", 1000.0) and carry.norm_sym("kPEPE") == ("PEPE", 1000.0)
+    bot2, _, br2, acct2, _ = _carry_setup(ast_px=105.0)                    # prices 5% apart: not the same token
+    bot2.step(T, br2, {})
+    assert not acct2["positions"]
+
+
+def test_carry_closes_both_legs_together():
+    T = 216 * HOUR
+    for move, why in (({"hlc:X": 70.0, "ast:X": 70.0}, "paired stop"),        # -30% on the long leg
+                      ({"hlc:X": 100.0, "ast:X": 120.0}, "drifted")):          # prices 20% apart
+        bot, _, br, acct, log = _carry_setup()
+        bot.step(T, br, {})
+        br.px.update(move)
+        bot.step(T + HOUR, br, {})
+        assert not acct["positions"] and not acct["mem"]["pairs"] and all(why in t["reason"] for t in log)
+    bot, _, br, acct, log = _carry_setup()                                 # one leg gone: the other follows
+    bot.step(T, br, {})
+    del acct["positions"]["ast:X"]
+    bot.step(T + HOUR, br, {})
+    assert not acct["positions"] and "other leg" in log[-1]["reason"]
+    bot, book, br, acct, _ = _carry_setup()                                # no data this hour: wait, don't unwind
+    bot.step(T, br, {})
+    from lab import carry
+    blind = carry.FundingCarry([], book)
+    br.px.clear()
+    blind.step(T + HOUR, br, {})
+    assert len(acct["positions"]) == 2 and "X" in acct["mem"]["pairs"]
+
+
+def test_turbo_copies_carry_at_fixed_size_untrimmed():
+    from lab import watcher as W
+    bot, _, cbr, cacct, _ = _carry_setup()
+    T = 216 * HOUR
+    bot.step(T, cbr, {})
+    tb = W.Turbo(["carry"], {"carry": cacct}, [], ["hlc:X", "ast:X"], lev=4.0, brake_dd=1.0, vol_target=0.0125,
+                 dd_start=0.12, dd_budget=0.25, min_scale=0.2)
+    tb.share = 1 / 3
+    tb.fixed_share = {"carry": 0.5}
+    acct = engine.new_account(500.0)
+    h = [500.0]
+    for i in range(20):
+        h.append(h[-1] * (1.04 if i % 2 else 0.96))                        # wild days: vol control cuts to ~30%
+    acct["mem"]["eq_daily"] = h
+    br = engine.Broker("turbo", acct, cbr.px, [])
+    tb.step(T, br, {})
+    for c in ("hlc:X", "ast:X"):
+        p, sp = acct["positions"][c], cacct["positions"][c]
+        assert p["fixed"] and abs(p["qty"] / (sp["qty"] * 0.5) - 1) < 1e-3   # half of the carry bot, no leverage
+    q = {c: p["qty"] for c, p in acct["positions"].items()}
+    tb.step(T + HOUR, br, {})
+    assert {c: p["qty"] for c, p in acct["positions"].items()} == q          # vol control leaves the hedge alone
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

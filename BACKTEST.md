@@ -323,6 +323,40 @@ Caveats:
 - Fills are at hourly closes.
 - At 3x, a ~30% move against one leg would liquidate it; a paired stop is needed.
 
+### Oct 24: carry in the engine, and Turbo one notch up (live from Oct 24)
+The blend above added daily returns. This re-runs carry as a real bot in `lab/engine.py`: both legs as positions, fees,
+slippage, funding paid hour by hour on Hyperliquid and at each settlement on Aster. Turbo then copies it.
+Reproduce with `python -m backtest.carry_bt --carry PATH/backtest365 --data CACHE [--turbo]`.
+
+**Carry alone, its paired stop** (close both legs if either moves X against itself, or the two prices drift Y apart):
+
+| stop X / drift Y | return | max drawdown | note |
+|---|---|---|---|
+| 15% / 3% (first try) | +13.7% | -9.9% | normal noise between hourly closes kept firing the drift guard (528 trades) |
+| 25% / none | negative year (-7.9% drawdown) | | one broken pair dragged the year down |
+| **25% / 15% (live)** | **+20.8%** | **-4.5%** | |
+
+**Inside Turbo.** Turbo copies carry at a fixed 50% of its money: no leverage, and never trimmed by its risk controls, since
+the two legs hedge each other. Turbo's own copies of the directional bots then get more room:
+
+| setup | $500 became | per day | max drawdown | worst day | TRAIN | TEST |
+|---|---|---|---|---|---|---|
+| Turbo before (3x, volatility target 1.5%/day), no carry | $1,907 | +0.40% | -13.9% | -6.1% | +77% / -13.9% | +115% / -12.5% |
+| A: 5x, volatility target 1.25%/day + carry | $2,348 | +0.46% | -14.3% | -8.4% | +97% / -14.3% | +137% / -13.9% |
+| **B: 4x, volatility target 1.25%/day + carry (live)** | **$2,222** | **+0.44%** | **-12.8%** | **-7.8%** | +94% / -12.4% | +127% / -12.8% |
+| C: 4x, volatility target 1.0%/day + carry | $1,996 | +0.41% | -11.8% | -7.8% | +85% / -11.3% | +114% / -11.8% |
+
+All four keep the drawdown backstop (full size until 12% below the peak, shrinking to 20% size by 25%). None was liquidated.
+Inside Turbo's window the carry bot made +20.5% with a -4.5% drawdown.
+
+B was picked. Against the old Turbo it makes 17% more money with a drawdown about 8% smaller (-12.8% vs -13.9%). It
+improves in both halves, so it is not one lucky stretch. The cost is a harsher worst single day (-7.8% vs -6.1%): more
+leverage on the directional copies means a sharp one-day move hits harder before the daily volatility control reacts.
+C is the safer choice if that matters more than return; A gives more return for slightly more drawdown. Switching is
+one line in `lab/main.py` (`TURBO_LEV`, `TURBO_RISK`).
+
+Live, the carry bot also runs on its own $500 account, so its record can be checked separately.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

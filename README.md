@@ -5,7 +5,7 @@ for free and publishes a live dashboard on GitHub Pages. **Paper only: no exchan
 
 **Live dashboard:** https://navin346.github.io/signal-lab/
 
-## What## The bots (v2)
+## The bots (v2)
 Each starts with a virtual **$500**; fees, slippage and Hyperliquid funding are charged.
 
 | Bot | How it trades | Markets |
@@ -15,6 +15,8 @@ Each starts with a virtual **$500**; fees, slippage and Hyperliquid funding are 
 | **News + regime** | The AI news analyst decides whether and which way to trade. The ADX regime (trend / range) sets the stop, target and holding time, ATR-scaled. Never trades on technicals alone. | same as market structure |
 | **TA trend** | 4H Donchian breakout (about 33 days) with an ADX trend filter, 2 ATR trailing stop, 1% risk. The backtest picked it over 4H EMA crossovers. | same |
 | **Watcher (self-learning)** | Records the conditions around every trade the four bots take (trend/range, with/against the daily structure, volatility, news, funding, time of day), learns which bot wins where, and copies their trades into its own account with a 0.5x–1.5x size tilt. It starts as an equal split. Free: statistics, no AI service. | whatever the bots trade |
+| **Funding carry** | No price bet. For coins on both Hyperliquid and Aster, short where funding is higher and buy where it is lower, equal dollars, so price moves cancel and the funding gap is collected. Holds the 5 biggest 7-day gaps (20%+ a year), re-checked every 3 days, 3x margin. Both legs close together if either moves 25% against itself or the two prices drift 15% apart. | the 40 most liquid coins on both exchanges |
+| **Turbo (growth)** | Copies the four bots, each on a third of its money at 4x, plus the carry bot on 50% of its money (no leverage, never trimmed). Risk controls: shrinks every directional position when its own daily swings exceed 1.25%, and below 12% from its peak keeps shrinking toward 20% size by a 25% drawdown. Liquidation is modelled. Backtest: +0.44%/day, worst drawdown -12.8%. | whatever the bots trade |
 | Coin flip, Always long | **controls**: a bot matters only if it beats both over 100+ trades | BTC, ETH, SOL, gold, oil, Nasdaq |
 
 How each was chosen, what lost, and the biases: **[BACKTEST.md](BACKTEST.md)**.
@@ -25,7 +27,7 @@ How each was chosen, what lost, and the biases: **[BACKTEST.md](BACKTEST.md)**.
 - To switch the model, set the repository variable `NEWS_MODEL` (default `claude-opus-5-5`; `claude-haiku-5-5` is far cheaper).
 - Requests use the API's server-side refusal fallback.
 
-locally
+## Run locally
 ```bash
 pip install -r requirements.txt
 python tests/test_core.py && python tests/test_engine.py

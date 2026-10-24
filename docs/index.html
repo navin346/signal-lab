@@ -142,6 +142,14 @@
     </div>
 
     <div class="card">
+      <h2>Funding carry</h2>
+      <p class="note">Coins listed on both Hyperliquid and Aster. Gap = 7-day average funding on Aster minus Hyperliquid, % a
+        year. The bot holds the 5 biggest gaps above 20% a year (short where funding is higher, long where it is lower).</p>
+      <p class="note" id="carrynext"></p>
+      <div class="scroll"><table id="carrytab"></table></div>
+    </div>
+
+    <div class="card">
       <h2>What the bots see right now</h2>
       <p class="note">Structure ▲/▼ = trend after a close beyond a deep swing; protected level = the swing whose loss flips it;
         leg = the swing it targets. Regime: ADX ≥ 25 trend, &lt; 20 range. News view −1…+1 (news bot acts at ±0.20).</p>
@@ -185,15 +193,15 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const NAMES = {turbo:"Turbo (3x)", watcher:"Watcher (learns)", ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
+const NAMES = {carry:"Funding carry", turbo:"Turbo (growth)", watcher:"Watcher (learns)", ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
   coin_flip:"Coin flip (control)", buy_hold:"Always long (control)", "BTC buy & hold":"BTC buy & hold",
   momentum_3d:"Trend 3d (v1)", momentum_7d:"Trend 7d (v1)", crowd_follow:"Follow crowd (v1)", crowd_fade:"Fade crowd (v1)",
   news:"News keywords (v1)", combo:"Combo (v1)", coin_flip_v1:"Coin flip (v1)", buy_hold_v1:"Always long (v1)"};
-const ORDER = ["turbo","watcher","ms_struct","rel_value","news_regime","ta_trend","coin_flip","buy_hold"];
-const SLOT = {turbo:"--s6", watcher:"--s5", ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
+const ORDER = ["turbo","watcher","ms_struct","rel_value","news_regime","ta_trend","carry","coin_flip","buy_hold"];
+const SLOT = {carry:"--s3", turbo:"--s6", watcher:"--s5", ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
   "BTC buy & hold":"--ctl"};
-const DASH = {coin_flip:[6,4], buy_hold:[2,3], "BTC buy & hold":[2,3]};
-const KEYCLS = {coin_flip:" dash", buy_hold:" dot", "BTC buy & hold":" dot"};
+const DASH = {carry:[8,3], coin_flip:[6,4], buy_hold:[2,3], "BTC buy & hold":[2,3]};
+const KEYCLS = {carry:" dash", coin_flip:" dash", buy_hold:" dot", "BTC buy & hold":" dot"};
 const CONTROLS = new Set(["coin_flip","buy_hold"]);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = id => document.getElementById(id);
@@ -246,7 +254,7 @@ function render(d){
   const nOpen = ORDER.reduce((n,s)=>n+(st[s]?.open||0),0), pOpen = ORDER.reduce((x,s)=>x+openPnl(d,s),0);
   const t24 = ago(d, "turbo", 24);
   $("tiles").replaceChildren(
-    tile("$"+fmt(t.equity), pc(t.return_pct), "Turbo (the 3x growth bot)"),
+    tile("$"+fmt(t.equity), pc(t.return_pct), "Turbo (the growth bot)"),
     tile(t24==null ? "–" : usd(t24).t, null, "Turbo, last 24 hours"),
     tile(NAMES[best], pc(st[best].return_pct), "best bot so far"),
     tile(String(nOpen), usd(pOpen), "open trades · profit on them now"));
@@ -273,6 +281,12 @@ function render(d){
 function details(d){
   const st = d.stats;
   fill("how", ["Bot",{t:"How it trades",c:"l"}], ORDER.map(s => [keyFor(s), {t: st[s].description, c:"wrap-cell"}]));
+  const cv = d.carry || {held:{}, top_gaps:[]};
+  $("carrynext").textContent = cv.next ? `Watching ${cv.pairs} coins. Next re-check: ${when(cv.next)}.` : "";
+  fill("carrytab", ["Coin","7-day funding gap (% a year)","Bot holds"], (cv.top_gaps||[]).map(([sym,g]) => {
+    const h = (cv.held||{})[sym];
+    return [{t:sym, c:"l"}, {t: sgn(g,1)+"%", c: Math.abs(g)>=20 ? "pos" : "muted"},
+            h ? {t: h.dir>0 ? "long Hyperliquid / short Aster" : "short Hyperliquid / long Aster"} : {t:"–", c:"muted"}]; }));
   const R = d.regimes || {};
   fill("see", ["Market","Price","Daily structure","4H structure","Protected level","Leg (target)","Regime","ADX","News view"],
     d.config.directional.map(c => { const r=R[c]||{}; const n=r.news;
@@ -362,7 +376,7 @@ function drawLive(d){
 }
 function drawBT(){
   if (!BT || !$("more").open) return;
-  const names = ["turbo","watcher","ms_struct","rel_value","ta_trend","BTC buy & hold"].filter(n => BT.curves[n]);
+  const names = ["turbo","watcher","ms_struct","rel_value","ta_trend","carry","BTC buy & hold"].filter(n => BT.curves[n]);
   const split = {id:"split", afterDraw(c){ const x=c.scales.x.getPixelForValue(BT.period[1]); const a=c.chartArea; const g=c.ctx; g.save();
     g.strokeStyle=css("--text-muted"); g.setLineDash([3,3]); g.beginPath(); g.moveTo(x,a.top); g.lineTo(x,a.bottom); g.stroke();
     g.fillStyle=css("--text-muted"); g.font="11px system-ui"; g.fillText("TRAIN ←  → TEST", x-46, a.top+12); g.restore(); }};
@@ -370,7 +384,7 @@ function drawBT(){
   $("btlegend").replaceChildren(...names.map(keyFor));
   const M = BT.metrics;
   fill("btmetrics", ["Bot","Half","Return","Max drawdown","Sharpe","Trades","Win rate","Profit factor"],
-    Object.keys(M).flatMap(b => ["train","test","full"].map(h => { const m=M[b][h];
+    Object.keys(M).filter(b => M[b].full).flatMap(b => ["train","test","full"].map(h => { const m=M[b][h];
       return [h==="train"?keyFor(b):"", h.toUpperCase(), pc(m.ret_pct,1), {t:fmt(m.max_dd_pct,1)+"%", c:"neg"}, fmt(m.sharpe,2), m.trades, fmt(m.win_pct,1)+"%", fmt(m.pf,2)]; })));
   fill("btref", ["Variant","TRAIN return (Sharpe)","TEST return (Sharpe)"], Object.entries(BT.reference).map(([k,v]) =>
     [{t:k, c:"wrap-cell"}, {t: sgn(v.train.ret_pct,1,"%")+" ("+fmt(v.train.sharpe,2)+")", c: v.train.ret_pct>0?"pos":"neg"},

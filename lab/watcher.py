@@ -59,6 +59,7 @@ class Watcher(Strategy):
         self.d, self.ctx = {}, {}
         self.stats, self.stats_T = {}, None
         self.share, self.max_gross = BASE_SHARE, 5.0
+        self.fixed_share = {}                                   # bot -> share copied without leverage or trimming
 
     def leverage(self, br, eq):
         """Extra size multiplier (the watcher itself: none)."""
@@ -182,15 +183,16 @@ class Watcher(Strategy):
             if not fresh:
                 continue
             src_eq = equity(acct, br.px)
-            if bot == "rel_value":
-                e, m, why = self.expect(bot, {})
+            fixed = self.fixed_share.get(bot)                 # e.g. carry: a hedged book, copied at a fixed size
+            if bot == "rel_value" or fixed:
+                e, m, why = self.expect(bot, {}) if not fixed else (0.0, 1.0, f"fixed {fixed:.0%} share")
             for c, p in fresh:
                 if c in br.acct["positions"] or c not in br.px or src_eq <= 0:
                     continue
-                if bot != "rel_value":
+                if bot != "rel_value" and not fixed:
                     e, m, why = self.expect(bot, p.get("ctx"))
-                lv = self.leverage(br, eq)
-                qty = p["qty"] * (eq / src_eq) * self.share * m * lv
+                lv = 1.0 if fixed else self.leverage(br, eq)
+                qty = p["qty"] * (eq / src_eq) * (fixed or self.share) * m * lv
                 room = max(0.0, eq * self.max_gross - sum(q["qty"] * br.px.get(k, q["entry"])
                                                           for k, q in br.acct["positions"].items()))
                 qty = min(qty, room / br.px[c])
@@ -200,8 +202,9 @@ class Watcher(Strategy):
                              note=why, signal_t=T, track_r=p.get("risk_px") is not None):
                     mem[c] = bot
                     br.acct["positions"][c]["ctx"] = p.get("ctx") or {}
-                    full = getattr(self, "lev", 1.0)                 # size it would have at full leverage
+                    full = 1.0 if fixed else getattr(self, "lev", 1.0)   # size it would have at full leverage
                     br.acct["positions"][c]["full_qty"] = qty * full / lv if lv else qty
+                    br.acct["positions"][c]["fixed"] = bool(fixed)
 
     # ------------------------------------------------------------------ reporting
     def report(self, T):
@@ -325,6 +328,8 @@ class Turbo(Watcher):
             sc = self.scale(br, br.equity())
             src_of = br.acct["mem"].get("src", {})
             for c, p in list(br.acct["positions"].items()):
+                if p.get("fixed"):                               # hedged carry legs are never trimmed one by one
+                    continue
                 sp = self.src.get(src_of.get(c), {}).get("positions", {}).get(c)
                 ratio = sp["qty"] / sp["qty0"] if sp else 1.0
                 target = p.get("full_qty", p["qty"]) * sc * ratio

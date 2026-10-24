@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from lab import analyst, engine, learn, market, news, paper, signals, universe
+from lab import analyst, carry, engine, learn, market, news, paper, signals, universe
 from lab import config as C
 from lab import strategies as S
 from lab import watcher as W
@@ -51,11 +51,21 @@ def build(top30, held_rv):
 
 
 BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
-ACTIVE = BOTS + ["watcher", "turbo"]
-TURBO_LEV = 3.0            # owner's choice; Oct 23 risk controls keep the backtest max drawdown under 15%
-TURBO_RISK = dict(brake_dd=1.0, vol_target=0.015, dd_start=0.12, dd_budget=0.25, min_scale=0.2)
+ACTIVE = BOTS + ["carry", "watcher", "turbo"]
+# Oct 24 ("option B", BACKTEST.md): Turbo one notch up (4x, volatility target 1.25%/day) plus the carry bot
+# copied on half of Turbo's money. Engine backtest: $500 -> $2,222, max drawdown -12.8% (Turbo alone at 3x:
+# $1,907, -13.9%). Options A (5x, 1.25%) and C (4x, 1.0%) are the other points on the same curve.
+TURBO_LEV = 4.0
+TURBO_RISK = dict(brake_dd=1.0, vol_target=0.0125, dd_start=0.12, dd_budget=0.25, min_scale=0.2)
+TURBO_CARRY_SHARE = 0.5
 DESCRIPTIONS = {
-    "watcher": W.Watcher.description, "turbo": W.Turbo.description.replace("~4x", f"~{TURBO_LEV:.0f}x"),
+    "watcher": W.Watcher.description,
+    "turbo": (f"Turbo (growth): copies the market-structure, relative-value, news and TA bots, each on a third of its "
+              f"money at {TURBO_LEV:.0f}x, plus the funding-carry bot on {TURBO_CARRY_SHARE:.0%} of its money (no extra "
+              f"leverage, never trimmed). "
+              f"Shrinks the directional copies when its own daily swings exceed {TURBO_RISK['vol_target']:.2%}, and "
+              f"keeps shrinking them if it falls 12%+ below its peak. Backtest: $500 -> $2,222, worst drop -12.8%"),
+    "carry": carry.FundingCarry.description,
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
     "news_regime": S.NewsRegime.description, "ta_trend": S.TATrend.description,
     "coin_flip": signals.DESCRIPTIONS["coin_flip"], "buy_hold": signals.DESCRIPTIONS["buy_hold"],
@@ -94,6 +104,9 @@ def migrate(state, marks_legacy, now):
         if "turbo" not in state["accounts"]:              # + turbo
             state["accounts"]["turbo"] = engine.new_account(C.START_EQUITY)
             state["turbo_started"] = now
+        if "carry" not in state["accounts"]:              # + funding carry (Oct 24)
+            state["accounts"]["carry"] = engine.new_account(C.START_EQUITY)
+            state["carry_started"] = now
         return
     retired = {}
     for s in RETIRED + CONTROLS:              # controls restart too, so every bot starts level
@@ -211,6 +224,12 @@ def tick():
     bots = build(top30, held_rv)
     for b in bots:
         b.prepare(data)
+    # funding carry: pairs listed on Hyperliquid and Aster (prices, funding history, current rates)
+    held_pairs = list(state["accounts"]["carry"]["mem"].get("pairs", {}))
+    pairs, book, cdata, cfund, cmarks = carry.build_live(ctx, data, held_pairs, errors)
+    data.update(cdata)
+    marks.update(cmarks)
+    cb = carry.FundingCarry(pairs, book)
     ctx = {"news": lambda coin, T: analyst.view(nitems, coin, T)}
     wt = W.Watcher(BOTS, {s: state["accounts"][s] for s in BOTS}, state["trades"], list(data),
                    funding=lambda c, t: funding.get(c))
@@ -225,14 +244,22 @@ def tick():
             for c, p in state["accounts"][s]["positions"].items():
                 p.setdefault("ctx", wt.context(s, c, p.get("signal_t") or p["opened"], p["side"]))
     accts = {s: state["accounts"][s] for s in ACTIVE}
-    fund_fn = {c: funding.get(c, 0.0) for c in data}
-    tb = W.Turbo(BOTS, {s: state["accounts"][s] for s in BOTS}, state["trades"], list(data),
+    def fund_fn(c, t):                                   # carry legs: their own funding history
+        return cfund(c, t) if c.startswith(("hlc:", "ast:")) else funding.get(c, 0.0)
+    srcs = BOTS + ["carry"]
+    tb = W.Turbo(srcs, {s: state["accounts"][s] for s in srcs}, state["trades"], list(data),
                  funding=lambda c, t: funding.get(c), lev=TURBO_LEV, **TURBO_RISK)
     tb.share = 1 / 3                                     # as backtested: each bot at a third, times the leverage
+    tb.fixed_share = {"carry": TURBO_CARRY_SHARE}        # carry on half the money, no leverage, never trimmed
     tb.prepare(data)
     tb.ctx = ctx
-    engine.run(bots + [wt, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
+    engine.run(bots + [cb, wt, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
                context_fn=wt.context)
+    state["carry_view"] = {"pairs": len(pairs), "held": state["accounts"]["carry"]["mem"].get("pairs", {}),
+                           "next": (t_to // HOUR // cb.p["rebalance_h"] + 1) * cb.p["rebalance_h"] * HOUR,
+                           "top_gaps": sorted(([p["sym"], round(g, 1)] for p in pairs
+                                               if (g := book.mean_gap(p["sym"], t_to, 168)) is not None),
+                                              key=lambda x: -abs(x[1]))[:10]}
     state["engine_T"] = t_to
     state["watcher_report"] = wt.report(t_to)
 
@@ -263,7 +290,8 @@ def tick():
     state["trades"] = state["trades"][-8000:]
     state["last_tick"] = now
     state["errors"] = errors
-    state["marks"] = {c: marks[c] for c in set(universe.DIRECTIONAL) | set(top30) | set(held_rv) if c in marks}
+    held_now = {c for s in ACTIVE for c in state["accounts"][s]["positions"]}
+    state["marks"] = {c: marks[c] for c in set(universe.DIRECTIONAL) | set(top30) | held_now if c in marks}
     state["marks_legacy"] = marks_legacy
     state["regimes"] = regimes(bots, t_to)
     for c, row in state["regimes"].items():
@@ -366,7 +394,8 @@ def write(state):
     summary = {
         "version": 2, "updated": state["last_tick"], "v2_started": v2, "engine_T": state.get("engine_T"),
         "config": {"start_equity": C.START_EQUITY, "directional": universe.DIRECTIONAL,
-                   "labels": {c: universe.label(c) for c in set(universe.DIRECTIONAL) | set(state.get("top30") or [])},
+                   "labels": {c: universe.label(c) for c in set(universe.DIRECTIONAL) | set(state.get("top30") or [])
+                              | set(state.get("marks", {}))},
                    "top30": state.get("top30") or universe.FALLBACK_TOP30, "top30_src": state.get("top30_src"),
                    "params": {k: v for k, v in PARAMS.items()},
                    "legacy_markets": LEGACY},
@@ -375,6 +404,7 @@ def write(state):
         "positions": {s: state["accounts"][s]["positions"] for s in ACTIVE + CONTROLS},
         "orders": {s: state["accounts"][s].get("orders", {}) for s in ACTIVE},
         "watcher": state.get("watcher_report"), "watcher_started": state.get("watcher_started"),
+        "carry": state.get("carry_view"), "carry_started": state.get("carry_started"),
         "turbo": {"started": state.get("turbo_started"), "lev": TURBO_LEV,
                   "peak": state["accounts"]["turbo"]["mem"].get("peak"),
                   "liquidations": state["accounts"]["turbo"]["mem"].get("liquidations", 0)},

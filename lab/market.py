@@ -37,7 +37,8 @@ def contexts(coins=None):
                 continue
             if coins is None or u["name"] in coins:
                 out[u["name"]] = {"mark": float(c["markPx"]), "funding": float(c["funding"]),
-                                  "oi": float(c["openInterest"]) * float(c["markPx"])}
+                                  "oi": float(c["openInterest"]) * float(c["markPx"]),
+                                  "vol": float(c.get("dayNtlVlm") or 0)}
     return out
 
 
@@ -56,3 +57,60 @@ def funding_history(coin, hours):
     end = int(time.time() * 1000)
     j = _post({"type": "fundingHistory", "coin": coin, "startTime": end - hours * 3_600_000})
     return [(x["time"], float(x["fundingRate"])) for x in j]
+
+
+# ---------------------------------------------------------------- Aster (Binance-style public API, no keys)
+AST = "https://fapi.asterdex.com/fapi/v1/"
+
+
+def _aget(path, params=None, tries=4):
+    for i in range(tries):
+        try:
+            r = requests.get(AST + path, params=params, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code == 429:
+                time.sleep(5 * (i + 1))
+                continue
+            r.raise_for_status()
+            return r.json()
+        except requests.RequestException:
+            if i == tries - 1:
+                raise
+            time.sleep(2 * (i + 1))
+    raise RuntimeError("Aster rate limit")
+
+
+def aster_markets():
+    """{symbol: {mark, rate (per interval), interval_h, vol}} for every USDT perp on Aster."""
+    prem = _aget("premiumIndex")
+    vol = {t["symbol"]: float(t.get("quoteVolume") or 0) for t in _aget("ticker/24hr")}
+    try:
+        iv = {f["symbol"]: float(f.get("fundingIntervalHours") or 8) for f in _aget("fundingInfo")}
+    except Exception:
+        iv = {}
+    out = {}
+    for p in prem:
+        s = p["symbol"]
+        if not s.endswith("USDT"):
+            continue
+        try:
+            out[s] = {"mark": float(p["markPrice"]), "rate": float(p["lastFundingRate"]), "interval_h": iv.get(s, 8.0),
+                      "vol": vol.get(s, 0.0)}
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def aster_candles(symbol, n, pause=0.1):
+    j = _aget("klines", {"symbol": symbol, "interval": "1h", "limit": min(n + 1, 1500)})
+    time.sleep(pause)
+    now = int(time.time() * 1000)
+    return [{"t": x[0], "o": float(x[1]), "h": float(x[2]), "l": float(x[3]), "c": float(x[4])}
+            for x in j if x[0] + HOUR <= now]
+
+
+def aster_funding(symbol, hours, pause=0.1):
+    """Settled funding payments [(time_ms, rate per interval)] over the last `hours`."""
+    start = int(time.time() * 1000) - hours * HOUR
+    j = _aget("fundingRate", {"symbol": symbol, "startTime": start, "limit": 1000})
+    time.sleep(pause)
+    return [(int(x["fundingTime"]), float(x["fundingRate"])) for x in j]
