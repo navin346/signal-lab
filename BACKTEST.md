@@ -156,6 +156,25 @@ This test used hourly prices: Binance spot for 26 of the 30 coins, Hyperliquid 4
 - **It stops sudden one-day crashes but not slow bleeds.** The max drawdown barely changed.
 - **Tighter breakers** fire more often and give up returns in the TRAIN half.
 
+#### Oct 24: which coins? (universe scenario test, live rules, 4h data)
+| universe | full year | Sharpe | max drawdown | worst day | TRAIN / TEST |
+|---|---|---|---|---|---|
+| top 10 (ranks 1-10), 3 per side | -23.8% | -0.34 | -45.2% | -12.0% | -39.9% / +27.6% |
+| middle 10 (ranks 11-20), 3 per side | +123.0% | 1.79 | -31.1% | -10.9% | +30.6% / +70.0% |
+| bottom 10 of the top 30 (ranks 21-30), 3 per side | +1.1% | 0.32 | -28.6% | -12.0% | -3.0% / +3.6% |
+| **top 30 (live), 5 per side** | **+169.0%** | **2.36** | **-19.3%** | **-7.5%** | +71.0% / +56.3% |
+| next 30 (ranks 31-59), 5 per side | -57.8% | -1.40 | -72.1% | -11.0% | +41.8% / -70.2% |
+| top 60, 5 per side | -23.6% | -0.11 | -50.0% | -12.0% | +9.6% / -29.8% |
+| top 60, 8 per side | +5.5% | 0.37 | -48.4% | -8.6% | +64.2% / -35.8% |
+
+**Smaller coins as a source of asymmetry (ranks 21-30 or 31-59):**
+- Every rule tried flipped between the two halves: momentum and reversal, 3-day and 7-day.
+- Drawdowns reached 65-74%. Their big moves are pumps and dumps that reverse unpredictably.
+
+**Top 10:** the majors move too much alike for "strong vs weak" to pay.
+
+**Top 30** has enough breadth that only the true extremes get traded, and it is the only universe that stayed solid in both halves. It stays.
+
 ### news_regime
 The regime rules alone lost in both halves (table above). So the bot never trades on them:
 - every entry needs the AI news analyst's view to agree;
