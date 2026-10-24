@@ -287,6 +287,42 @@ Added to Turbo, they gave $1,746 / $1,813 / $1,615 (snap-back, crowd fade, both)
 
 **What a 1%-a-day target with a drawdown under 15% needs.** Roughly a Sharpe of 6-8; Turbo is about 3.3. The way there is more independent edges, each passing the full-year engine test. Today's two candidates did not.
 
+### Oct 24: funding carry as a second source of profit (passes)
+**Strategy:** cross-venue carry, Hyperliquid x Aster, the 60 most liquid shared symbols. Hold the 5 pairs with the largest
+7-day-average funding gap, short where funding is higher and long where it is lower. Rebalance every 3 days, enter at a
+20% APR gap, keep a pair while the gap is above 10%, 3x margin, 0.26% round trip.
+
+The settings are the earlier study's defaults, not tuned on this window. Data: hourly funding on both venues; Aster hourly
+prices; Hyperliquid prices from March onward, filled from 4h candles before that.
+
+| carry setting | yearly, on margin | max drawdown | worst day | Sharpe | halves |
+|---|---|---|---|---|---|
+| default | +14.9% | -2.3% | -1.5% | 1.52 | +7.7% / +5.4% |
+| default at 0.18% cost | +18.0% | -2.3% | -1.5% | 1.82 | +9.1% / +6.7% |
+| 14-day window, 30% min | +10.7% | -1.9% | -1.5% | 1.61 | +6.6% / +2.9% |
+| 8 pairs, 15% min | +11.0% | -1.7% | -1.4% | 1.53 | +6.2% / +3.6% |
+| 3 pairs, 40% min | +9.1% | -2.4% | -1.1% | 1.43 | +3.8% / +4.3% |
+
+Correlation with Turbo's daily returns: 0.08 (0.06 / 0.09 by half).
+
+**Blended with Turbo, 335 overlapping days:**
+
+| setup | $500 became | per day | max drawdown | worst day | Sharpe |
+|---|---|---|---|---|---|
+| Turbo alone | $1,992 | +0.41% | -13.9% | -6.1% | 3.48 |
+| 80% Turbo / 20% carry | $1,575 | +0.34% | -10.7% | -4.8% | 3.54 |
+| Turbo + carry on 50% of equity | $2,122 | +0.43% | -12.7% | -5.8% | 3.59 |
+| Turbo + carry on 100% of equity | $2,255 | +0.45% | -12.0% | -5.6% | 3.66 |
+| same, Turbo sized 1.1x | $2,561 | +0.49% | -13.3% | -6.2% | 3.65 |
+
+"Turbo + carry" means the same money backs both. This works because Turbo uses only about 15-20% of equity as margin.
+
+Caveats:
+- Carry needs funds on a second exchange (Aster).
+- Its profit is concentrated in thinner coins, and the universe was picked by today's volume.
+- Fills are at hourly closes.
+- At 3x, a ~30% move against one leg would liquidate it; a paired stop is needed.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.
