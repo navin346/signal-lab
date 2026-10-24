@@ -52,10 +52,10 @@ def build(top30, held_rv):
 
 BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
 ACTIVE = BOTS + ["carry", "watcher", "turbo"]
-# Oct 24 ("option B", BACKTEST.md): Turbo one notch up (4x, volatility target 1.25%/day) plus the carry bot
-# copied on half of Turbo's money. Engine backtest: $500 -> $2,222, max drawdown -12.8% (Turbo alone at 3x:
-# $1,907, -13.9%). Options A (5x, 1.25%) and C (4x, 1.0%) are the other points on the same curve.
-TURBO_LEV = 4.0
+# Oct 24 ("option A", BACKTEST.md): Turbo at 5x, volatility target 1.25%/day, plus the carry bot copied on half
+# of Turbo's money. Engine backtest: $500 -> $2,348, max drawdown -14.3%, worst day -8.4% (Turbo alone at 3x:
+# $1,907, -13.9%). Options B (4x, 1.25%: $2,222, -12.8%) and C (4x, 1.0%) are calmer points on the same curve.
+TURBO_LEV = 5.0
 TURBO_RISK = dict(brake_dd=1.0, vol_target=0.0125, dd_start=0.12, dd_budget=0.25, min_scale=0.2)
 TURBO_CARRY_SHARE = 0.5
 DESCRIPTIONS = {
@@ -64,7 +64,7 @@ DESCRIPTIONS = {
               f"money at {TURBO_LEV:.0f}x, plus the funding-carry bot on {TURBO_CARRY_SHARE:.0%} of its money (no extra "
               f"leverage, never trimmed). "
               f"Shrinks the directional copies when its own daily swings exceed {TURBO_RISK['vol_target']:.2%}, and "
-              f"keeps shrinking them if it falls 12%+ below its peak. Backtest: $500 -> $2,222, worst drop -12.8%"),
+              f"keeps shrinking them if it falls 12%+ below its peak. Backtest: $500 -> $2,348, worst drop -14.3%"),
     "carry": carry.FundingCarry.description,
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
     "news_regime": S.NewsRegime.description, "ta_trend": S.TATrend.description,

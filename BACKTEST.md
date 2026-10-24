@@ -323,7 +323,7 @@ Caveats:
 - Fills are at hourly closes.
 - At 3x, a ~30% move against one leg would liquidate it; a paired stop is needed.
 
-### Oct 24: carry in the engine, and Turbo one notch up (live from Oct 24)
+### Oct 24: carry in the engine, and Turbo turned up (live from Oct 24)
 The blend above added daily returns. This re-runs carry as a real bot in `lab/engine.py`: both legs as positions, fees,
 slippage, funding paid hour by hour on Hyperliquid and at each settlement on Aster. Turbo then copies it.
 Reproduce with `python -m backtest.carry_bt --carry PATH/backtest365 --data CACHE [--turbo]`.
@@ -342,8 +342,8 @@ the two legs hedge each other. Turbo's own copies of the directional bots then g
 | setup | $500 became | per day | max drawdown | worst day | TRAIN | TEST |
 |---|---|---|---|---|---|---|
 | Turbo before (3x, volatility target 1.5%/day), no carry | $1,907 | +0.40% | -13.9% | -6.1% | +77% / -13.9% | +115% / -12.5% |
-| A: 5x, volatility target 1.25%/day + carry | $2,348 | +0.46% | -14.3% | -8.4% | +97% / -14.3% | +137% / -13.9% |
-| **B: 4x, volatility target 1.25%/day + carry (live)** | **$2,222** | **+0.44%** | **-12.8%** | **-7.8%** | +94% / -12.4% | +127% / -12.8% |
+| **A: 5x, volatility target 1.25%/day + carry (live)** | **$2,348** | **+0.46%** | **-14.3%** | **-8.4%** | +97% / -14.3% | +137% / -13.9% |
+| B: 4x, volatility target 1.25%/day + carry (live Oct 24, first hours) | $2,222 | +0.44% | -12.8% | -7.8% | +94% / -12.4% | +127% / -12.8% |
 | C: 4x, volatility target 1.0%/day + carry | $1,996 | +0.41% | -11.8% | -7.8% | +85% / -11.3% | +114% / -11.8% |
 
 All four keep the drawdown backstop (full size until 12% below the peak, shrinking to 20% size by 25%). None was liquidated.
@@ -354,6 +354,10 @@ improves in both halves, so it is not one lucky stretch. The cost is a harsher w
 leverage on the directional copies means a sharp one-day move hits harder before the daily volatility control reacts.
 C is the safer choice if that matters more than return; A gives more return for slightly more drawdown. Switching is
 one line in `lab/main.py` (`TURBO_LEV`, `TURBO_RISK`).
+
+**Same day: switched to A (5x).** The owner chose more return over the smaller drawdown. Against the old Turbo: 23% more
+money ($2,348 vs $1,907) for a drawdown 0.4 points deeper (-14.3% vs -13.9%), still under the 15% limit, and a worst
+day of -8.4% (vs -6.1%).
 
 Live, the carry bot also runs on its own $500 account, so its record can be checked separately.
 
