@@ -317,6 +317,18 @@ def test_carry_closes_both_legs_together():
     assert len(acct["positions"]) == 2 and "X" in acct["mem"]["pairs"]
 
 
+def test_carry_funding_settlement_timing():
+    from lab import carry
+    S = 100 * HOUR                                                          # an Aster settlement, every 4h
+    fund = carry.charge_map([(S, -0.01), (S + 4 * HOUR, 0.001)])
+    acct, log = engine.new_account(500.0), []
+    br = engine.Broker("carry", acct, {"ast:X": 100.0}, log)
+    br.market("ast:X", -1, 1.0, S, stop=1e9, track_r=False)                # short opened right at the settlement
+    for h in range(4):                                                      # candles closing S+1h .. S+4h
+        br.on_bar("ast:X", bar(S + h * HOUR, 100, 100, 100, 100), fund.get(S + h * HOUR, 0.0))
+    assert abs(acct["positions"]["ast:X"]["funding"] - 0.1) < 1e-9         # not the -1% at S, only the +0.1% at S+4h
+
+
 def test_turbo_copies_carry_at_fixed_size_untrimmed():
     from lab import watcher as W
     bot, _, cbr, cacct, _ = _carry_setup()

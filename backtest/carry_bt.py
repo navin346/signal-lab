@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backtest import run as R  # noqa: E402
 from lab import engine, strategies as S, watcher as W  # noqa: E402
-from lab.carry import FundingBook, FundingCarry, norm_sym  # noqa: E402
+from lab.carry import FundingBook, FundingCarry, charge_map, norm_sym  # noqa: E402
 
 HOUR = engine.HOUR
 
@@ -50,8 +50,8 @@ def load_carry(carry_dir, cache_dir):
             prev = t
             ev.append((t, x, max(1.0, ih)))
         book.ast[sym] = ev
-        fund[hl_key] = book.hl[sym]
-        fund[ast_key] = {t // HOUR * HOUR: x for t, x, _ in ev}       # paid once, at the settlement hour
+        fund[hl_key] = charge_map(r["hl_funding"])
+        fund[ast_key] = charge_map(r["ast_funding"])                   # paid once per settlement
         pairs.append({"sym": sym, "hl": hl_key, "ast": ast_key, "hl_mult": r["hl_mult"], "ast_mult": r["ast_mult"]})
     return pairs, book, candles, fund
 

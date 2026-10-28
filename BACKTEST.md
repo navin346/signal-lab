@@ -334,7 +334,7 @@ Reproduce with `python -m backtest.carry_bt --carry PATH/backtest365 --data CACH
 |---|---|---|---|
 | 15% / 3% (first try) | +13.7% | -9.9% | normal noise between hourly closes kept firing the drift guard (528 trades) |
 | 25% / none | negative year (-7.9% drawdown) | | one broken pair dragged the year down |
-| **25% / 15% (live)** | **+20.8%** | **-4.5%** | |
+| **25% / 15% (live)** | **+20.4%** | **-4.5%** | halves +16.8% / +3.0% |
 
 **Inside Turbo.** Turbo copies carry at a fixed 50% of its money: no leverage, and never trimmed by its risk controls, since
 the two legs hedge each other. Turbo's own copies of the directional bots then get more room:
@@ -342,22 +342,29 @@ the two legs hedge each other. Turbo's own copies of the directional bots then g
 | setup | $500 became | per day | max drawdown | worst day | TRAIN | TEST |
 |---|---|---|---|---|---|---|
 | Turbo before (3x, volatility target 1.5%/day), no carry | $1,907 | +0.40% | -13.9% | -6.1% | +77% / -13.9% | +115% / -12.5% |
-| **A: 5x, volatility target 1.25%/day + carry (live)** | **$2,348** | **+0.46%** | **-14.3%** | **-8.4%** | +97% / -14.3% | +137% / -13.9% |
-| B: 4x, volatility target 1.25%/day + carry (live Oct 24, first hours) | $2,222 | +0.44% | -12.8% | -7.8% | +94% / -12.4% | +127% / -12.8% |
-| C: 4x, volatility target 1.0%/day + carry | $1,996 | +0.41% | -11.8% | -7.8% | +85% / -11.3% | +114% / -11.8% |
+| **A: 5x, volatility target 1.25%/day + carry (live)** | **$2,343** | **+0.46%** | **-14.3%** | **-8.3%** | +96% / -14.3% | +137% / -13.9% |
+| B: 4x, volatility target 1.25%/day + carry (live Oct 24, first hours) | $2,217 | +0.44% | -12.8% | -7.8% | +94% / -12.4% | +127% / -12.8% |
+| C: 4x, volatility target 1.0%/day + carry | $1,992 | +0.41% | -11.7% | -7.8% | +85% / -11.3% | +114% / -11.7% |
 
 All four keep the drawdown backstop (full size until 12% below the peak, shrinking to 20% size by 25%). None was liquidated.
-Inside Turbo's window the carry bot made +20.5% with a -4.5% drawdown.
+Inside Turbo's window the carry bot made +20.1% with a -4.5% drawdown.
 
-B was picked. Against the old Turbo it makes 17% more money with a drawdown about 8% smaller (-12.8% vs -13.9%). It
+B was picked first. Against the old Turbo it makes 16% more money with a drawdown about 8% smaller (-12.8% vs -13.9%). It
 improves in both halves, so it is not one lucky stretch. The cost is a harsher worst single day (-7.8% vs -6.1%): more
 leverage on the directional copies means a sharp one-day move hits harder before the daily volatility control reacts.
 C is the safer choice if that matters more than return; A gives more return for slightly more drawdown. Switching is
 one line in `lab/main.py` (`TURBO_LEV`, `TURBO_RISK`).
 
 **Same day: switched to A (5x).** The owner chose more return over the smaller drawdown. Against the old Turbo: 23% more
-money ($2,348 vs $1,907) for a drawdown 0.4 points deeper (-14.3% vs -13.9%), still under the 15% limit, and a worst
-day of -8.4% (vs -6.1%).
+money ($2,343 vs $1,907) for a drawdown 0.4 points deeper (-14.3% vs -13.9%), still under the 15% limit, and a worst
+day of -8.3% (vs -6.1%).
+
+**Oct 28: funding timing fix.** Every carry entry is at 00:00 UTC, which is also an Aster settlement. The engine charged
+the settlement at the instant a pair opened (a real account opening just after it would not pay it) and skipped the
+one at the instant it closed (a real account still holding would get it). Payments now go to the candle that closes at
+the payment time (`carry.charge_map`). All numbers in this section are re-run with the fix; they moved by under 1%
+(option A was $2,348). Live, one ANIME settlement on Oct 25 was booked under the old rule (about -$1.60 for carry,
+-$0.80 for Turbo); past bookings were left as they are.
 
 Live, the carry bot also runs on its own $500 account, so its record can be checked separately.
 

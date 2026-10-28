@@ -47,6 +47,14 @@ def norm_sym(s):
     return ALIASES.get(s, s), mult
 
 
+def charge_map(payments):
+    """[(payment time, rate)] -> {candle open hour: rate}. A payment at time s goes to whoever holds
+    through s; in the engine that is the candle that closes at s (opens at s - 1h). So a pair opened
+    at a settlement hour (every rebalance is at 00:00 UTC, an Aster settlement) does not get that
+    settlement, and one closed at a settlement hour still does."""
+    return {t // HOUR * HOUR - HOUR: x for t, x in payments}
+
+
 class FundingBook:
     """Hourly funding of both legs of every pair, as % a year, for the trailing-average signal.
 
@@ -213,8 +221,8 @@ def build_live(hl_ctx, have, held, errors, top=40, history_h=216):
             ev.append((t, x, max(1.0, (t - prev) / HOUR) if prev else av["interval_h"]))
             prev = t
         book.ast[sym] = ev
-        fnow[hk] = (book.hl[sym], hv["funding"])
-        fnow[ak] = ({t // HOUR * HOUR: x for t, x, _ in ev}, 0.0)            # paid once, at the settlement hour
+        fnow[hk] = (charge_map(hf), hv["funding"])
+        fnow[ak] = (charge_map(af), 0.0)                                      # paid once per settlement
         marks[hk], marks[ak] = hv["mark"], av["mark"]
         pairs.append({"sym": sym, "hl": hk, "ast": ak, "hl_mult": hmult, "ast_mult": amult})
 
