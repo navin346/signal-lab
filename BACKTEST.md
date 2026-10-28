@@ -368,6 +368,53 @@ the payment time (`carry.charge_map`). All numbers in this section are re-run wi
 
 Live, the carry bot also runs on its own $500 account, so its record can be checked separately.
 
+### Oct 28: lower timeframes and order flow (one candidate, nothing adopted yet)
+**Data:** Binance USDT-M futures 5m candles (with taker-buy volume) and 5m open interest / long-short ratios from
+data.binance.vision, Oct 2025 - Oct 2026, the 12 crypto coins the directional bots trade. Train = before 2026-04-21.
+
+**1. Costs at each timeframe.** Median candle move vs the 13 bps round trip (taker fee + slippage, both sides):
+
+| candle | median move | cost as % of a typical move | with maker orders (3 bps) |
+|---|---|---|---|
+| 5m | 9 bps | 139% | 32% |
+| 15m | 17 bps | 79% | 18% |
+| 30m | 23 bps | 56% | 13% |
+| 1h | 33 bps | 40% | 9% |
+| 4h | 65 bps | 20% | 5% |
+| 1d | 177 bps | 7% | 2% |
+
+Below 1h, market orders cost about as much as a normal candle moves. Trading there needs maker (limit) orders and an
+always-on machine, not the hourly GitHub run.
+
+**2. Lower-timeframe entries for the existing bots.** Their backtest trades replayed on the 5m candles (same exits):
+
+| entry | ms_struct train / test | ta_trend train / test |
+|---|---|---|
+| at the signal (baseline) | +32.7% / +8.5% | +15.4% / +41.4% |
+| wait for a 15m close beyond the last four 15m bars | +31.1% / +1.2% | +11.8% / +34.4% |
+| same, stop tucked behind those 15m bars | +7.0% / -8.4% | -17.7% / +40.4% |
+| limit order 30% back toward the stop, 4h | +17.9% / +3.9% | +20.0% / +59.1% |
+
+Confirmation on 15m enters later and higher, and tight 15m stops get hit by noise. The pullback limit order helped
+ta_trend, so it was run in the engine: alone, ta_trend went from +43% to +77% a year (Sharpe 1.05 -> 1.39), and the
+whole 20-40% / 4-8h neighbourhood helped. But inside Turbo (5x + carry), even with Turbo mirroring the limit orders,
+the year fell from $2,343 to $2,179 and the drawdown deepened to -15.5%. Not adopted.
+
+**3. Order-flow signals** (15m bars; thresholds fitted on train, signed move after the signal, before costs):
+most of 15 ideas flipped sign between halves (aggressive buying/selling, absorption, crowd long/short ratio,
+long-liquidation bounces, momentum). One held in both halves: a **short-covering fade**. A sharp 1h rise while open
+interest falls means shorts are being forced out rather than new buyers arriving, and the move tends to give back.
+On the hourly clock, one trade per event, sell at the next open, hold 4h, net of 13 bps:
+
+| rule | train | test |
+|---|---|---|
+| 1h rise in top 10%, OI change in bottom 10% | 54 trades, +45 bps avg, 57% win | 48 trades, +57 bps, 60% win |
+| top 20% / bottom 20% (wider) | 278 trades, +25 bps, 52% win | 241 trades, +27 bps, 54% win |
+
+10 of 11 coins positive (strict version). The mirror image (buy after a long liquidation) loses. Live, open-interest
+history is free from OKX (5m, no key; Binance and Bybit block US servers). Next step: an engine bot, alone and inside
+Turbo, before any live use.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.
