@@ -447,6 +447,11 @@ carry), removing ms_struct cuts the backtest from $2,343 to $1,484: that year fl
 | BTC when BTC and Nasdaq above their 100-day averages, else gold | +64.2%/yr | +43.5%/yr | +50.7%/yr | -41.1% |
 | hold the top-1 asset by 60-day momentum, weekly | +38.6%/yr | +87.6%/yr | +68.1%/yr | -80.0% |
 
+**Live from Oct 30:** Turbo stops copying ms_struct (ms_struct keeps running alone); "trend_2x" runs the ta_trend
+rules at 2% risk (six years: +37% a year, every year positive, -43% worst drop); "rotation" runs the BTC / gold /
+cash rule. In the engine, with fees and perp funding, rotation made +44% / +46% a year by half (+45% overall, -47%
+worst drop), below the +61% of the cost-light daily study above.
+
 Picked from 16 rules, so some selection luck; the 100-day versions were the ones that held in both halves (50 and
 200 days were each weaker in one half).
 

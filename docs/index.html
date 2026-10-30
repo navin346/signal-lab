@@ -193,15 +193,15 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-const NAMES = {carry:"Funding carry", turbo:"Turbo (growth)", watcher:"Watcher (learns)", ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
+const NAMES = {trend_2x:"Trend 2x (growth)", rotation:"Rotation (BTC / gold)", carry:"Funding carry", turbo:"Turbo (growth)", watcher:"Watcher (learns)", ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
   coin_flip:"Coin flip (control)", buy_hold:"Always long (control)", "BTC buy & hold":"BTC buy & hold",
   momentum_3d:"Trend 3d (v1)", momentum_7d:"Trend 7d (v1)", crowd_follow:"Follow crowd (v1)", crowd_fade:"Fade crowd (v1)",
   news:"News keywords (v1)", combo:"Combo (v1)", coin_flip_v1:"Coin flip (v1)", buy_hold_v1:"Always long (v1)"};
-const ORDER = ["turbo","watcher","ms_struct","rel_value","news_regime","ta_trend","carry","coin_flip","buy_hold"];
-const SLOT = {carry:"--s3", turbo:"--s6", watcher:"--s5", ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
+const ORDER = ["trend_2x","rotation","turbo","watcher","ms_struct","rel_value","news_regime","ta_trend","carry","coin_flip","buy_hold"];
+const SLOT = {trend_2x:"--s4", rotation:"--s5", carry:"--s3", turbo:"--s6", watcher:"--s5", ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
   "BTC buy & hold":"--ctl"};
-const DASH = {carry:[8,3], coin_flip:[6,4], buy_hold:[2,3], "BTC buy & hold":[2,3]};
-const KEYCLS = {carry:" dash", coin_flip:" dash", buy_hold:" dot", "BTC buy & hold":" dot"};
+const DASH = {ta_trend:[8,3], rotation:[8,3], carry:[8,3], coin_flip:[6,4], buy_hold:[2,3], "BTC buy & hold":[2,3]};
+const KEYCLS = {ta_trend:" dash", rotation:" dash", carry:" dash", coin_flip:" dash", buy_hold:" dot", "BTC buy & hold":" dot"};
 const CONTROLS = new Set(["coin_flip","buy_hold"]);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = id => document.getElementById(id);
@@ -250,12 +250,12 @@ function render(d){
   const st = d.stats;
   const ranked = ORDER.filter(s=>st[s]).sort((a,b)=>st[b].equity-st[a].equity);
   const bots = ranked.filter(s=>!CONTROLS.has(s));
-  const best = bots[0], t = st.turbo;
+  const lead = st.trend_2x ? "trend_2x" : "turbo", best = bots[0], t = st[lead];
   const nOpen = ORDER.reduce((n,s)=>n+(st[s]?.open||0),0), pOpen = ORDER.reduce((x,s)=>x+openPnl(d,s),0);
-  const t24 = ago(d, "turbo", 24);
+  const t24 = ago(d, lead, 24);
   $("tiles").replaceChildren(
-    tile("$"+fmt(t.equity), pc(t.return_pct), "Turbo (the growth bot)"),
-    tile(t24==null ? "–" : usd(t24).t, null, "Turbo, last 24 hours"),
+    tile("$"+fmt(t.equity), pc(t.return_pct), NAMES[lead]),
+    tile(t24==null ? "–" : usd(t24).t, null, NAMES[lead].replace(/ \(.*/, "") + ", last 24 hours"),
     tile(NAMES[best], pc(st[best].return_pct), "best bot so far"),
     tile(String(nOpen), usd(pOpen), "open trades · profit on them now"));
 
@@ -271,7 +271,7 @@ function render(d){
   drawLive(d);
   $("legend").replaceChildren(...ORDER.map(keyFor));
 
-  const pf=$("pfilter"); if (!pf.options.length) { [["all","All bots"], ...ORDER.map(s=>[s,NAMES[s]])].forEach(([v,tx]) => { const o=el("option",tx); o.value=v; pf.appendChild(o); }); pf.value="turbo"; pf.onchange = () => positions(DATA); }
+  const pf=$("pfilter"); if (!pf.options.length) { [["all","All bots"], ...ORDER.map(s=>[s,NAMES[s]])].forEach(([v,tx]) => { const o=el("option",tx); o.value=v; pf.appendChild(o); }); pf.value="all"; pf.onchange = () => positions(DATA); }
   positions(d);
   const f=$("filter"); if (!f.options.length) { [["all","All bots"], ...ORDER.map(s=>[s,NAMES[s]]), ["v1","Retired v1 bots"]].forEach(([v,tx]) => { const o=el("option",tx); o.value=v; f.appendChild(o); }); f.onchange = () => { recent(DATA); trades(DATA); }; }
   recent(d);

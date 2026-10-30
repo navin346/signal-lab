@@ -287,6 +287,58 @@ class TATrend(Strategy):
                       note=f"ADX {d['adx'][i]:.0f}", signal_t=T)
 
 
+class TrendBig(TATrend):
+    """The same TA-trend rules at a bigger size (Oct 30): six years of top-5 crypto + gold made money in
+    every year at every size tested; 2% risk per trade made +37% a year with a -43% worst drop."""
+    name = "trend_2x"
+    description = ("Trend 2x: exactly the TA trend bot's rules (4H breakout of the ~33-day high/low with ADX, 2 ATR "
+                   "trailing stop) at 2% risk per trade instead of 1%. Six-year backtest: +37% a year, every year "
+                   "positive, worst drop -43%")
+
+
+class Rotation(Strategy):
+    """Which asset when (Oct 30, BACKTEST.md): once a day, hold BTC while it is above its 100-day average;
+    otherwise gold while gold is above its own 100-day average; otherwise cash. No leverage.
+    2020-2026: +61% a year in both halves, worst drop -44% (BTC held: +34% a year, -77%)."""
+    name, every_h = "rotation", 24
+    description = ("Rotation (calm core): once a day, holds BTC while BTC is above its 100-day average, else gold "
+                   "while gold is above its 100-day average, else cash. No leverage. Six-year backtest: +61% a year, "
+                   "worst drop -44% (holding BTC: +34% a year, -77%)")
+
+    def __init__(self, btc="BTC", gold="xyz:GOLD", days=100):
+        self.order, self.days = [btc, gold], days
+        self.coins = [btc, gold]
+        self.d = {}
+
+    def prepare(self, data):
+        self.d = {c: frame(data[c], 24) for c in self.coins if c in data and len(data[c]) > 30}
+
+    def _above(self, c, T):
+        tf = self.d.get(c)
+        i = tf.at(T) if tf else -1
+        if i < self.days - 1:
+            return None
+        avg = sum(b["c"] for b in tf.b[i - self.days + 1:i + 1]) / self.days
+        return tf.b[i]["c"] > avg
+
+    def step(self, T, br, ctx):
+        want = None
+        for c in self.order:
+            up = self._above(c, T)
+            if up is None:
+                return                                    # not enough history: change nothing
+            if up:
+                want = c
+                break
+        for c in list(br.acct["positions"]):
+            if c != want:
+                br.close(c, T, "rotation: " + (f"switching to {want}" if want else "both below their 100-day average, to cash"))
+        if want and not br.position(want) and want in br.px:
+            px = br.px[want]
+            br.market(want, 1, br.equity() * 0.98 / px, T, stop=px * 0.01, setup="rotation",
+                      note=f"{want} above its {self.days}-day average", signal_t=T, track_r=False)
+
+
 # =========================================================================== regime + news
 class NewsRegime(Strategy):
     """News decides IF and which way; the market regime decides HOW.

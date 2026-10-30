@@ -353,6 +353,40 @@ def test_turbo_copies_carry_at_fixed_size_untrimmed():
     assert {c: p["qty"] for c, p in acct["positions"].items()} == q          # vol control leaves the hedge alone
 
 
+def test_rotation_btc_gold_cash():
+    from lab import strategies as S
+    D = 24 * HOUR
+    def daily(prices):
+        return [bar(i * D + h * HOUR, p, p, p, p) for i, p in enumerate(prices) for h in range(24)]
+    up, down = [100 + i for i in range(120)], [220 - i for i in range(120)]
+    T = 120 * D
+    for btc, gold, want in ((up, up, "BTC"), (down, up, "xyz:GOLD"), (down, down, None)):
+        rot = S.Rotation()
+        rot.prepare({"BTC": daily(btc), "xyz:GOLD": daily(gold)})
+        acct, log = engine.new_account(500.0), []
+        br = engine.Broker("rotation", acct, {"BTC": btc[-1], "xyz:GOLD": gold[-1]}, log)
+        rot.step(T, br, {})
+        assert list(acct["positions"]) == ([want] if want else [])
+        if want:
+            p = acct["positions"][want]
+            assert abs(p["qty"] * p["entry"] - 490) < 2                     # whole account, no leverage
+    rot = S.Rotation()                                                     # BTC turns down: switch to gold
+    rot.prepare({"BTC": daily(up + down[:60]), "xyz:GOLD": daily(up + up[:60])})
+    acct, log = engine.new_account(500.0), []
+    br = engine.Broker("rotation", acct, {"BTC": 200.0, "xyz:GOLD": 200.0}, log)
+    acct["positions"]["BTC"] = dict(side=1, qty=2.0, qty0=2.0, entry=200.0, stop=2.0, stop0=2.0, target=None,
+                                    target0=None, tp1=None, tp1_frac=0.5, be=True, time_stop=None, opened=0,
+                                    signal_t=0, fee_in=0.0, funding=0.0, risk_px=None, setup="", note="")
+    rot.step(180 * D, br, {})
+    assert list(acct["positions"]) == ["xyz:GOLD"] and "switching to xyz:GOLD" in log[-1]["reason"]
+
+
+def test_trend_2x_is_ta_trend_at_double_risk():
+    from lab import strategies as S
+    a, b = S.TATrend(["BTC"], risk_pct=1.0), S.TrendBig(["BTC"], risk_pct=2.0)
+    assert b.name == "trend_2x" and a.name == "ta_trend" and b.p["risk_pct"] == 2 * a.p["risk_pct"]
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
