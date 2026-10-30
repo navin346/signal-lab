@@ -415,6 +415,41 @@ On the hourly clock, one trade per event, sell at the next open, hold 4h, net of
 history is free from OKX (5m, no key; Binance and Bybit block US servers). Next step: an engine bot, alone and inside
 Turbo, before any live use.
 
+### Oct 30: six years (Nov 2020 - Oct 2026), top-5 crypto + gold, and "which asset when"
+**Data:** Binance futures 1h (BTC, ETH, BNB, XRP, SOL), PAXG 1h for gold, Binance funding as a stand-in for
+Hyperliquid's; Yahoo daily Nasdaq-100 and gold futures. Covers the 2021 boom, Luna, FTX, the 2022 bear and 2024-25.
+
+**The bots, live settings:**
+
+| bot | 6 years | max drawdown | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|
+| ms_struct | -77.9% | -79.3% | -16.7% | +26.6% | -11.6% | -39.9% | -40.6% | -26.7% |
+| ta_trend | +191.3% | -24.0% | +24.8% | +4.9% | +22.1% | +7.4% | +12.6% | +56.3% |
+| Turbo (5x, copies both) | -5.7% | -40.4% | +22.8% | +7.7% | +0.6% | -13.4% | -11.7% | +6.6% |
+| Turbo copying ta_trend only | +131% | -24.7% | +37% | -3% | +14% | +2% | +15% | +35% |
+| BTC buy & hold | +482.5% | | +59.6% | -64.2% | +155.9% | +121.1% | -6.4% | -8.6% |
+
+ms_struct lost on every coin (BTC, ETH, BNB, XRP, SOL); its one-year result came from the coins in that year's list.
+ta_trend won on every coin and lost slightly on gold. Inside the live Turbo (last year, with relative value and
+carry), removing ms_struct cuts the backtest from $2,343 to $1,484: that year flattered it.
+
+**Which asset when** (daily, no leverage, 0.1% per switch; first half 2020-22, second 2023-26):
+- Gold is not the opposite of BTC: daily correlation +0.04 / +0.13. After BTC and the Nasdaq both fell for 20 days,
+  gold's next 20 days were -0.1% (2020-22) and +3.0% (2023-26, baseline +1.8%). It does not rise when crypto falls;
+  it just does not fall with it.
+- After both fell, crypto kept falling in 2020-22 and bounced in 2023-26: no reliable pattern.
+
+| rule | 2020-22 | 2023-26 | all | max drawdown |
+|---|---|---|---|---|
+| buy & hold BTC | +9.5%/yr | +50.6%/yr | +34.2%/yr | -76.6% |
+| **BTC while above its 100-day average, else gold while above its own, else cash** | **+61.3%/yr** | **+60.7%/yr** | **+60.9%/yr** | **-44.2%** |
+| each of the 7 held only while above its 100-day average (1/7 each) | +114.3%/yr | +32.7%/yr | +57.9%/yr | -34.0% |
+| BTC when BTC and Nasdaq above their 100-day averages, else gold | +64.2%/yr | +43.5%/yr | +50.7%/yr | -41.1% |
+| hold the top-1 asset by 60-day momentum, weekly | +38.6%/yr | +87.6%/yr | +68.1%/yr | -80.0% |
+
+Picked from 16 rules, so some selection luck; the 100-day versions were the ones that held in both halves (50 and
+200 days were each weaker in one half).
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.
