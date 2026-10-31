@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Lab</title>
+<meta name="description" content="Paper-trading research lab: market-structure, relative-value, news and trend bots against coin-flip controls.">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0; --surface-1: #fcfcfb; --line: #e4e2dc;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #7a7974;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #6250d6; --ctl: #9a9893;
+    --good: #0ca30c; --critical: #d03b3b; --good-text: #006300; --bad-text: #b02a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #121211; --surface-1: #1a1a19; --line: #2e2e2c;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #9085e9; --ctl: #77766f;
+      --good-text: #5fd35f; --bad-text: #ef7b7b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --line: #2e2e2c;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e88;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #9085e9; --ctl: #77766f;
+    --good-text: #5fd35f; --bad-text: #ef7b7b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface-0); color: var(--text-primary);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: baseline; }
+  h1 { margin: 0; font-size: 22px; }
+  h2 { font-size: 16px; margin: 0 0 4px; }
+  .sub, .note { color: var(--text-secondary); }
+  .note { font-size: 12px; margin: 0 0 10px; }
+  .badge { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px;
+           font-size: 12px; color: var(--text-secondary); margin-right: 6px; }
+  button, select { font: inherit; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--line);
+           border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 16px 0; }
+  .tile, .card { background: var(--surface-1); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .tile span { color: var(--text-secondary); font-size: 12px; }
+  .card { margin-bottom: 14px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+  th:first-child, td:first-child, td.l, th.l { text-align: left; }
+  td.wrap-cell { white-space: normal; min-width: 240px; text-align: left; color: var(--text-secondary); }
+  .pos { color: var(--good-text); } .neg { color: var(--bad-text); } .muted { color: var(--text-muted); }
+  .key { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+  .key.dash { border-top-style: dashed; } .key.dot { border-top-style: dotted; border-top-width: 3px; }
+  .chart-box { position: relative; height: 340px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 0; font-size: 12px; color: var(--text-secondary); }
+  .tag { display: inline-block; font-size: 11px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px;
+         margin: 0 4px 2px 0; color: var(--text-secondary); }
+  .news li { margin: 0 0 12px; } .news a { color: var(--text-primary); overflow-wrap: anywhere; }
+  .grid2 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .grid2 > * { min-width: 0; }
+  .newsbox { max-height: 560px; overflow-y: auto; }
+  @media (min-width: 900px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+  details summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; margin: 6px 0; }
+  footer { color: var(--text-muted); font-size: 12px; margin-top: 24px; }
+  .err { border: 1px solid var(--critical); color: var(--bad-text); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
+  .tile small { display: block; font-size: 13px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .more > summary { font-size: 15px; font-weight: 600; color: var(--text-primary); padding: 4px 0; }
+  .more[open] > summary { margin-bottom: 12px; }
+  .more .card { background: var(--surface-1); }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Signal Lab</h1>
+      <div class="sub">Paper-trading bots with virtual money. No real money is used.</div>
+    </div>
+    <div><span class="badge" id="updated">loading…</span><button id="theme" type="button">Theme</button></div>
+  </header>
+  <div id="errors"></div>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card">
+    <h2>How each bot is doing</h2>
+    <p class="note">Every bot started with $500 of paper money on <span id="v2start"></span>. Grey rows are the
+      <b>controls</b> (a coin flip and "always buy"): a bot only proves itself by beating both of them after about 100 trades.</p>
+    <div class="scroll"><table id="score"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Money over time</h2>
+    <div class="chart-box"><canvas id="equity" aria-label="Equity per bot over time" role="img"></canvas></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="card" id="open">
+    <h2>Open trades</h2>
+    <p class="note">Still running, so the profit can still change. Tap a row for the reason it was opened.</p>
+    <div class="toolbar"><label for="pfilter" class="note" style="margin:0">Show</label><select id="pfilter"></select>
+      <span class="note" id="psum" style="margin:0"></span></div>
+    <div class="scroll"><table id="positions"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>Latest closed trades</h2>
+    <div class="toolbar"><label for="filter" class="note" style="margin:0">Show</label><select id="filter"></select></div>
+    <div class="scroll"><table id="recent"></table></div>
+  </div>
+
+  <details class="more" id="more">
+    <summary>More details (strategy rules, backtest, news, full trade log)</summary>
+
+    <div class="card">
+      <h2>How each bot trades</h2>
+      <div class="scroll"><table id="how"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Watcher: what it has learned</h2>
+      <p class="note">Copies the four bots and learns which one wins in which conditions; tilts copy size between 0.5x and 1.5x
+        only after 30+ trades of evidence. Started <span id="wstart"></span>.</p>
+      <ul id="journal" style="padding-left:18px;margin:0 0 10px"></ul>
+      <div class="scroll"><table id="wbots"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Backtest: last 12 months, same engine, fees and funding</h2>
+      <p class="note">Settings picked on the first half (TRAIN), checked on the second (TEST, after the line). Method, error
+        bars and biases: <a href="https://github.com/navin346/signal-lab/blob/main/BACKTEST.md" target="_blank" rel="noopener noreferrer">BACKTEST.md</a>.</p>
+      <div class="chart-box"><canvas id="btchart" aria-label="Backtest equity curves" role="img"></canvas></div>
+      <div class="legend" id="btlegend"></div>
+      <div class="scroll" style="margin-top:10px"><table id="btmetrics"></table></div>
+      <details><summary>What else was tested and lost</summary><div class="scroll"><table id="btref"></table></div></details>
+    </div>
+
+    <div class="card">
+      <h2>Funding carry</h2>
+      <p class="note">Coins listed on both Hyperliquid and Aster. Gap = 7-day average funding on Aster minus Hyperliquid, % a
+        year. The bot holds the 5 biggest gaps above 20% a year (short where funding is higher, long where it is lower).</p>
+      <p class="note" id="carrynext"></p>
+      <div class="scroll"><table id="carrytab"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>What the bots see right now</h2>
+      <p class="note">Structure ▲/▼ = trend after a close beyond a deep swing; protected level = the swing whose loss flips it;
+        leg = the swing it targets. Regime: ADX ≥ 25 trend, &lt; 20 range. News view −1…+1 (news bot acts at ±0.20).</p>
+      <div class="scroll"><table id="see"></table></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>News analyst</h2>
+        <p class="note" id="analyst"></p>
+        <div class="newsbox"><ul class="news" id="news" style="padding-left:18px;margin:0"></ul></div>
+      </div>
+      <div class="card">
+        <h2>Relative-value universe</h2>
+        <p class="note" id="rvnote"></p>
+        <div class="scroll"><table id="rv"></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Full trade log (for cross-checking on Hyperliquid)</h2>
+      <p class="note">Times UTC. Signal = the candle close the decision was made on; market orders fill at that close
+        (+0.02% slippage); stops and targets fill at their price at the end of the hourly candle that touched them. Recorded =
+        when the bot actually ran. <a id="csv-trades" href="data/trades.csv" download>All trades (CSV)</a> ·
+        <a id="csv-pos" href="data/positions.csv" download>Open positions (CSV)</a></p>
+      <div class="scroll"><table id="trades"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Retired v1 bots</h2>
+      <div class="scroll"><table id="retired"></table></div>
+    </div>
+  </details>
+
+  <footer>
+    Prices: Hyperliquid public API (gold, oil and Nasdaq-100 are trade.xyz perps). Market caps: CoinPaprika. News: Google
+    News, CoinDesk, Cointelegraph, Federal Reserve. Runs free on GitHub Actions. Fees, slippage and funding are charged.
+    Not investment advice.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const NAMES = {trend_2x:"Trend 2x (growth)", rotation:"Rotation (BTC / gold)", carry:"Funding carry", turbo:"Turbo (growth)", watcher:"Watcher (learns)", ms_struct:"Market structure", rel_value:"Relative value", news_regime:"News + regime", ta_trend:"TA trend",
+  coin_flip:"Coin flip (control)", buy_hold:"Always long (control)", "BTC buy & hold":"BTC buy & hold",
+  momentum_3d:"Trend 3d (v1)", momentum_7d:"Trend 7d (v1)", crowd_follow:"Follow crowd (v1)", crowd_fade:"Fade crowd (v1)",
+  news:"News keywords (v1)", combo:"Combo (v1)", coin_flip_v1:"Coin flip (v1)", buy_hold_v1:"Always long (v1)"};
+const ORDER = ["trend_2x","rotation","turbo","watcher","ms_struct","rel_value","news_regime","ta_trend","carry","coin_flip","buy_hold"];
+const SLOT = {trend_2x:"--s4", rotation:"--s5", carry:"--s3", turbo:"--s6", watcher:"--s5", ms_struct:"--s1", rel_value:"--s2", news_regime:"--s3", ta_trend:"--s4", coin_flip:"--ctl", buy_hold:"--ctl",
+  "BTC buy & hold":"--ctl"};
+const DASH = {ta_trend:[8,3], rotation:[8,3], carry:[8,3], coin_flip:[6,4], buy_hold:[2,3], "BTC buy & hold":[2,3]};
+const KEYCLS = {ta_trend:" dash", rotation:" dash", carry:" dash", coin_flip:" dash", buy_hold:" dot", "BTC buy & hold":" dot"};
+const CONTROLS = new Set(["coin_flip","buy_hold"]);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const $ = id => document.getElementById(id);
+const fmt = (x, d=2) => x == null ? "–" : Number(x).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d});
+const sgn = (x, d=2, suf="") => x == null ? "–" : (x > 0 ? "+" : "") + fmt(x, d) + suf;
+const when = ms => new Date(ms).toLocaleString(undefined,{month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
+const utc = ms => ms ? new Date(ms).toISOString().slice(0,16).replace("T"," ") : "–";
+const px = v => v == null ? "–" : fmt(v, v >= 1000 ? 1 : v >= 10 ? 3 : v >= 0.1 ? 4 : 6);
+function el(tag, text, cls){ const e=document.createElement(tag); if(text!=null) e.textContent=text; if(cls) e.className=cls; return e; }
+function row(cells, head){ const tr=el("tr"); cells.forEach(c => { const td=el(head?"th":"td"); if(c instanceof Node) td.appendChild(c); else if (c && typeof c==="object") { td.textContent=c.t; if(c.c) td.className=c.c; if(c.title) td.title=c.title; } else td.textContent=c; tr.appendChild(td); }); return tr; }
+function fill(id, head, rows){ const t=$(id); t.replaceChildren(row(head,true)); rows.forEach(r => t.appendChild(row(r))); if(!rows.length) t.appendChild(row([{t:"nothing yet", c:"muted l"}])); }
+const pc = (x,d=2) => ({t: sgn(x,d,"%"), c: x>0?"pos":x<0?"neg":""});
+const side = s => s>0 ? {t:"▲ long", c:"pos"} : s<0 ? {t:"▼ short", c:"neg"} : {t:"– flat", c:"muted"};
+const trend = s => s>0 ? {t:"▲ up", c:"pos"} : s<0 ? {t:"▼ down", c:"neg"} : {t:"–", c:"muted"};
+function keyFor(s){ const w=el("span"); const k=el("span",null,"key"+(KEYCLS[s]||"")); k.style.borderColor=css(SLOT[s]); w.append(k, document.createTextNode(NAMES[s]||s)); return w; }
+let LABELS = {}, MARKETS = {};
+const label = c => LABELS[c] || c;
+function marketOf(t){ return (t.strategy in {coin_flip:1,buy_hold:1} || /_v1$|^(momentum|crowd|news$|combo)/.test(t.strategy)) ? (MARKETS[t.asset]||t.asset) : t.asset; }
+function chartLink(m){ const x=el("a","chart"); x.href="https://app.hyperliquid.xyz/trade/"+encodeURIComponent(m).replace("%3A",":"); x.target="_blank"; x.rel="noopener noreferrer"; return x; }
+
+let chart, btchart, DATA, BT;
+const usd = (v, d=2) => v==null ? {t:"–", c:"muted"} : {t: (v<0?"-$":v>0?"+$":"$")+fmt(Math.abs(v), d), c: v>0?"pos":v<0?"neg":""};
+function ago(d, s, hours){            // equity change over the last `hours`
+  const pts = d.curve.filter(p => p.eq[s]!=null); if (pts.length < 2) return null;
+  const now = pts[pts.length-1], cut = now.t - hours*3600e3;
+  const then = [...pts].reverse().find(p => p.t <= cut) || pts[0];
+  return then.t < now.t ? now.eq[s] - then.eq[s] : null;
+}
+function openPnl(d, s){
+  let tot = 0;
+  for (const [a,p] of Object.entries(d.positions[s]||{})) {
+    const m = CONTROLS.has(s) ? d.marks_legacy[a] : d.marks[a]; if (m) tot += p.side*p.qty*(m-p.entry);
+  }
+  return tot;
+}
+function tile(big, small, label, cls){ const t=el("div",null,"tile"); const b=el("b", big); t.append(b);
+  if (small) t.append(el("small", small.t, small.c)); t.append(el("span", label)); return t; }
+
+function render(d){
+  DATA = d;
+  LABELS = d.config.labels || {}; MARKETS = d.config.legacy_markets || {};
+  $("updated").textContent = "Updated " + when(d.updated);
+  $("v2start").textContent = d.v2_started ? new Date(d.v2_started).toLocaleDateString(undefined,{month:"short",day:"numeric"}) : "–";
+  const errs = Object.entries(d.errors||{}).filter(([k]) => !k.startsWith("news"));      // a missing news feed is not worth a banner
+  $("errors").replaceChildren(...(errs.length ? [el("div", "Data problem on the last run: " + errs.map(([k,v])=>k+" ("+v+")").join("; "), "err")] : []));
+  const st = d.stats;
+  const ranked = ORDER.filter(s=>st[s]).sort((a,b)=>st[b].equity-st[a].equity);
+  const bots = ranked.filter(s=>!CONTROLS.has(s));
+  const lead = st.trend_2x ? "trend_2x" : "turbo", best = bots[0], t = st[lead];
+  const nOpen = ORDER.reduce((n,s)=>n+(st[s]?.open||0),0), pOpen = ORDER.reduce((x,s)=>x+openPnl(d,s),0);
+  const t24 = ago(d, lead, 24);
+  $("tiles").replaceChildren(
+    tile("$"+fmt(t.equity), pc(t.return_pct), NAMES[lead]),
+    tile(t24==null ? "–" : usd(t24).t, null, NAMES[lead].replace(/ \(.*/, "") + ", last 24 hours"),
+    tile(NAMES[best], pc(st[best].return_pct), "best bot so far"),
+    tile(String(nOpen), usd(pOpen), "open trades · profit on them now"));
+
+  fill("score", ["Bot","Money","Return","Last 24h","Closed trades","Win rate","Worst drop","Open trades","Beats both controls?"],
+    ranked.map(s => { const x=st[s]; const beats = !CONTROLS.has(s) && x.equity>st.coin_flip.equity && x.equity>st.buy_hold.equity;
+      const name = keyFor(s); if (CONTROLS.has(s)) name.className = "muted";
+      return [name, "$"+fmt(x.equity), pc(x.return_pct), usd(ago(d, s, 24)), x.trades, x.win_pct==null?"–":fmt(x.win_pct,0)+"%",
+        {t: fmt(x.max_dd_pct,1)+"%", c: x.max_dd_pct<0?"neg":""}, openLink(s, x.open),
+        CONTROLS.has(s) ? {t:"control", c:"muted"} : x.trades < 30 ? {t:"too early", c:"muted", title: x.trades+" closed trades; judge after ~100"}
+          : x.trades < 100 ? (beats ? {t:"✓ so far", c:"pos", title:"ahead, but under 100 trades"} : {t:"✗ so far", c:"neg", title:"behind, but under 100 trades"})
+          : beats ? {t:"✓ yes", c:"pos"} : {t:"✗ no", c:"neg"}]; }));
+
+  drawLive(d);
+  $("legend").replaceChildren(...ORDER.map(keyFor));
+
+  const pf=$("pfilter"); if (!pf.options.length) { [["all","All bots"], ...ORDER.map(s=>[s,NAMES[s]])].forEach(([v,tx]) => { const o=el("option",tx); o.value=v; pf.appendChild(o); }); pf.value="all"; pf.onchange = () => positions(DATA); }
+  positions(d);
+  const f=$("filter"); if (!f.options.length) { [["all","All bots"], ...ORDER.map(s=>[s,NAMES[s]]), ["v1","Retired v1 bots"]].forEach(([v,tx]) => { const o=el("option",tx); o.value=v; f.appendChild(o); }); f.onchange = () => { recent(DATA); trades(DATA); }; }
+  recent(d);
+  if ($("more").open) details(d);
+}
+
+function details(d){
+  const st = d.stats;
+  fill("how", ["Bot",{t:"How it trades",c:"l"}], ORDER.map(s => [keyFor(s), {t: st[s].description, c:"wrap-cell"}]));
+  const cv = d.carry || {held:{}, top_gaps:[]};
+  $("carrynext").textContent = cv.next ? `Watching ${cv.pairs} coins. Next re-check: ${when(cv.next)}.` : "";
+  fill("carrytab", ["Coin","7-day funding gap (% a year)","Bot holds"], (cv.top_gaps||[]).map(([sym,g]) => {
+    const h = (cv.held||{})[sym];
+    return [{t:sym, c:"l"}, {t: sgn(g,1)+"%", c: Math.abs(g)>=20 ? "pos" : "muted"},
+            h ? {t: h.dir>0 ? "long Hyperliquid / short Aster" : "short Hyperliquid / long Aster"} : {t:"–", c:"muted"}]; }));
+  const R = d.regimes || {};
+  fill("see", ["Market","Price","Daily structure","4H structure","Protected level","Leg (target)","Regime","ADX","News view"],
+    d.config.directional.map(c => { const r=R[c]||{}; const n=r.news;
+      return [label(c), px(d.marks[c]), trend(r.ms_1d), trend(r.ms_4h), px(r.ms_protect), px(r.ms_leg), r.regime||"–",
+        r.adx==null?"–":fmt(r.adx,0), n==null?"–":{t: sgn(n,2), c: n>=0.2?"pos":n<=-0.2?"neg":"muted"}]; }));
+  $("analyst").textContent = "Last run: " + (d.analyst_status||"–") + ". Headlines that could move a market, with direction (▲/▼) and confidence.";
+  const ul=$("news"); ul.replaceChildren(...(d.news_items||[]).slice(0,40).map(n => { const li=el("li");
+    const a=el("a", n.title); if (/^https?:\/\//.test(n.link||"")) { a.href=n.link; a.target="_blank"; a.rel="noopener noreferrer"; } li.appendChild(a);
+    const eff=el("div"); eff.appendChild(el("span", n.impact+" impact", "tag"));
+    const shown = n.effects.length > 8 ? n.effects.filter((e,i)=>i<4) : n.effects;
+    shown.forEach(e => eff.appendChild(el("span", (e.direction>0?"▲ ":e.direction<0?"▼ ":"· ")+label(e.asset)+" "+fmt(e.confidence,2), "tag " + (e.direction>0?"pos":e.direction<0?"neg":""))));
+    if (n.effects.length > 8) eff.appendChild(el("span", "+"+(n.effects.length-4)+" more", "tag"));
+    li.append(eff, el("div", n.why||"", "muted"), el("div", n.source + " · " + when(n.ts*1000) + " · by " + n.by, "muted")); return li; }));
+  if(!(d.news_items||[]).length) ul.appendChild(el("li","no market-moving headlines analysed yet","muted"));
+  const rvpos = d.positions.rel_value || {};
+  $("rvnote").textContent = "Top 30 coins by market cap with a Hyperliquid perp (source: " + (d.config.top30_src||"built-in list") + ", refreshed daily).";
+  fill("rv", ["#",{t:"Coin",c:"l"},"Price","Bot holds"], d.config.top30.map((c,i) => [String(i+1), {t: label(c), c:"l"}, px(d.marks[c]), rvpos[c] ? side(rvpos[c].side) : {t:"–",c:"muted"}]));
+  const W = d.watcher || {bots:{}, journal:[]};
+  $("wstart").textContent = d.watcher_started ? utc(d.watcher_started) + " UTC" : "–";
+  $("journal").replaceChildren(...(W.journal||[]).map(tx => el("li", tx)));
+  const cond = rs => (rs||[]).map(r => `${r.feature}=${r.value} (${sgn(r.edge,2)}R, n=${r.n})`).join("; ") || "–";
+  fill("wbots", ["Bot","Trades seen","Win rate","Avg R","Copy size now",{t:"Best conditions",c:"l"},{t:"Weakest conditions",c:"l"}],
+    Object.entries(W.bots||{}).map(([b,v]) => [keyFor(b), v.n, v.win==null?"–":fmt(v.win,1)+"%", v.avg_r==null?"–":sgn(v.avg_r,2),
+      v.warm ? "x"+fmt(v.multiplier,2) : {t:"x1.00 (learning)", c:"muted"}, {t:cond(v.best), c:"wrap-cell"}, {t:cond(v.worst), c:"wrap-cell"}]));
+  trades(d);
+  if (!location.hostname.endsWith("github.io")) { const base = RAW.replace("summary.json", ""); $("csv-trades").href = base + "trades.csv"; $("csv-pos").href = base + "positions.csv"; }
+  fill("retired", ["Bot","Final money","Trades","What it did"], Object.entries(d.retired||{}).map(([s,r]) =>
+    [NAMES[s]||s, "$"+fmt(r.equity), r.trades ?? "–", {t:r.description, c:"wrap-cell"}]));
+  drawBT();
+}
+
+function openLink(s, n){
+  if (!n) return "0";
+  const a=el("a", String(n)); a.href="#open";
+  a.onclick = () => { $("pfilter").value = s; positions(DATA); };
+  return a;
+}
+
+function positions(d){
+  const v=$("pfilter").value || "all";
+  let tot=0, n=0;
+  const rows = ORDER.filter(s => v==="all" || s===v).flatMap(s => Object.entries(d.positions[s]||{}).map(([a,p]) => {
+    const m = CONTROLS.has(s) ? d.marks_legacy[a] : d.marks[a];
+    const pnl = m ? p.side*p.qty*(m-p.entry) : null;
+    if (pnl!=null) { tot+=pnl; n++; }
+    const book = (p.setup||"").includes("RV");          // relative-value legs are protected at book level, not per coin
+    const r = row([NAMES[s], label(a), side(p.side), "$"+fmt(p.qty*p.entry,0), usd(pnl),
+                   book ? {t:"whole-book limit", c:"muted"} : px(p.stop), when(p.opened)]);
+    r.title = (p.setup ? p.setup + ". " : "") + (p.note || "");
+    return r; }));
+  const t=$("positions"); t.replaceChildren(row(["Bot","Coin","Direction","Size","Profit now","Exit if price hits (stop)","Opened"], true), ...rows);
+  if (!rows.length) t.appendChild(row([{t:"no open trades", c:"muted l"}]));
+  $("psum").textContent = n ? `${n} open · profit on them now ${tot<0?"-$":"+$"}${fmt(Math.abs(tot))}` : "";
+}
+
+const keepT = (t, v) => v==="all" ? true : v==="v1" ? !ORDER.includes(t.strategy) : t.strategy===v;
+function recent(d){
+  const v=$("filter").value || "all";
+  fill("recent", ["Bot","Coin","Direction","Opened","Closed","Profit","Why it closed"],
+    d.trades.filter(t => keepT(t, v)).slice(0,15).map(t => [NAMES[t.strategy]||t.strategy, label(t.asset), side(t.side==="long"?1:-1),
+      when(t.opened), when(t.closed), usd(t.pnl), {t: t.reason, c:"l"}]));
+}
+
+function trades(d){
+  const v=$("filter").value || "all";
+  fill("trades", ["Bot","Market","Side","Setup","Signal (UTC)","Entry","Initial stop","Closed (UTC)","Exit","Move","R","P&L ($)","Why closed","Recorded","Verify"],
+    d.trades.filter(t => keepT(t, v)).slice(0,200).map(t => [NAMES[t.strategy]||t.strategy, label(t.asset), side(t.side==="long"?1:-1), t.setup||"",
+      utc(t.signal_t||t.opened), px(t.entry), px(t.stop0), utc(t.closed), px(t.exit), pc(t.move_pct),
+      t.r==null?"–":sgn(t.r,2), {t: sgn(t.pnl,2), c: t.pnl>0?"pos":"neg", title: t.note||""}, t.reason, utc(t.booked), chartLink(marketOf(t))]));
+}
+
+function lineChart(canvas, datasets, old, extra){
+  const grid = css("--line"), ink = css("--text-secondary");
+  if (old) old.destroy();
+  return new Chart(canvas, {type: "line", data: {datasets}, plugins: extra ? [extra] : [], options: {
+    responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
+    interaction: {mode: "index", intersect: false},
+    scales: {x: {type: "linear", ticks: {color: ink, maxTicksLimit: 7, callback: v => new Date(v).toLocaleDateString(undefined,{month:"short",day:"numeric"})}, grid: {color: grid}},
+             y: {ticks: {color: ink, callback: v => "$"+fmt(v,0)}, grid: {color: grid}}},
+    plugins: {legend: {display: false}, tooltip: {itemSort: (a,b) => b.parsed.y - a.parsed.y,
+      callbacks: {title: it => it.length ? when(it[0].parsed.x) : "", label: it => " $" + fmt(it.parsed.y) + "  " + it.dataset.label}}}}});
+}
+const ds = (name, pts) => ({label: NAMES[name]||name, data: pts, borderColor: css(SLOT[name]), borderWidth: 2,
+  borderDash: DASH[name]||[], pointRadius: 0, pointHoverRadius: 4, tension: 0, pointHoverBorderColor: css("--surface-1"), pointHoverBorderWidth: 2});
+function drawLive(d){
+  chart = lineChart($("equity"), ORDER.map(s => ds(s, d.curve.filter(p => p.eq[s]!=null).map(p => ({x:p.t, y:p.eq[s]})))), chart);
+}
+function drawBT(){
+  if (!BT || !$("more").open) return;
+  const names = ["turbo","watcher","ms_struct","rel_value","ta_trend","carry","BTC buy & hold"].filter(n => BT.curves[n]);
+  const split = {id:"split", afterDraw(c){ const x=c.scales.x.getPixelForValue(BT.period[1]); const a=c.chartArea; const g=c.ctx; g.save();
+    g.strokeStyle=css("--text-muted"); g.setLineDash([3,3]); g.beginPath(); g.moveTo(x,a.top); g.lineTo(x,a.bottom); g.stroke();
+    g.fillStyle=css("--text-muted"); g.font="11px system-ui"; g.fillText("TRAIN ←  → TEST", x-46, a.top+12); g.restore(); }};
+  btchart = lineChart($("btchart"), names.map(n => ds(n, BT.curves[n].map(p => ({x:p.t, y:p.eq})))), btchart, split);
+  $("btlegend").replaceChildren(...names.map(keyFor));
+  const M = BT.metrics;
+  fill("btmetrics", ["Bot","Half","Return","Max drawdown","Sharpe","Trades","Win rate","Profit factor"],
+    Object.keys(M).filter(b => M[b].full).flatMap(b => ["train","test","full"].map(h => { const m=M[b][h];
+      return [h==="train"?keyFor(b):"", h.toUpperCase(), pc(m.ret_pct,1), {t:fmt(m.max_dd_pct,1)+"%", c:"neg"}, fmt(m.sharpe,2), m.trades, fmt(m.win_pct,1)+"%", fmt(m.pf,2)]; })));
+  fill("btref", ["Variant","TRAIN return (Sharpe)","TEST return (Sharpe)"], Object.entries(BT.reference).map(([k,v]) =>
+    [{t:k, c:"wrap-cell"}, {t: sgn(v.train.ret_pct,1,"%")+" ("+fmt(v.train.sharpe,2)+")", c: v.train.ret_pct>0?"pos":"neg"},
+     {t: sgn(v.test.ret_pct,1,"%")+" ("+fmt(v.test.sharpe,2)+")", c: v.test.ret_pct>0?"pos":"neg"}]));
+}
+
+function applyTheme(t){ if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; if (DATA) render(DATA); }
+$("more").addEventListener("toggle", () => { if ($("more").open && DATA) details(DATA); });
+try { const t = localStorage.getItem("signal-lab-theme"); if (t) applyTheme(t); } catch (e) {}
+$("theme").addEventListener("click", () => {
+  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = dark ? "light" : "dark"; applyTheme(next); try { localStorage.setItem("signal-lab-theme", next); } catch (e) {}
+});
+// On GitHub Pages the data sits next to this page; anywhere else (e.g. Vercel) read it from the gh-pages branch.
+const RAW = "https://raw.githubusercontent.com/navin346/signal-lab/gh-pages/data/summary.json";
+const RAWBT = "https://raw.githubusercontent.com/navin346/signal-lab/gh-pages/backtest.json";
+const onPages = location.hostname.endsWith("github.io");
+async function load(list){ for (const u of list) { try { const r = await fetch(u + (u.startsWith("http") ? "" : "?t=" + Date.now())); if (r.ok) return await r.json(); } catch (e) {} } return null; }
+(async () => {
+  BT = await load(onPages ? ["backtest.json", RAWBT] : [RAWBT, "backtest.json"]);
+  const d = await load(onPages ? ["data/summary.json", RAW] : [RAW, "data/summary.json"]);
+  if (d && d.version === 2) render(d);
+  else $("errors").replaceChildren(el("div", "Waiting for the first run of the new bots to publish data.", "err"));
+})();
+</script>
+</body>
+</html>
