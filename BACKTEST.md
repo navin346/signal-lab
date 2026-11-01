@@ -455,6 +455,24 @@ worst drop), below the +61% of the cost-light daily study above.
 Picked from 16 rules, so some selection luck; the 100-day versions were the ones that held in both halves (50 and
 200 days were each weaker in one half).
 
+### Nov 1: Kronos (open-source candlestick forecasting model) - not useful at our costs
+Kronos-small, every day at 00:00 UTC, next 24 hourly closes for BTC, ETH, SOL, XRP, BNB from the 400 hours before,
+Nov 2025 - Oct 2026 (after the model's Aug 2025 release, so it never saw these prices). 1,805 forecasts:
+
+| horizon | direction right | rank correlation | trade every forecast, after 13 bps | only the 30% most confident |
+|---|---|---|---|---|
+| 4h | 53.6% (53.3 / 53.8 by half) | +0.07 | -10.4 bps | -3.7 bps |
+| 24h | 49.3% | -0.01 | -23.4 bps | -33.2 bps |
+
+A faint, consistent edge at 4 hours that is smaller than the trading cost; nothing at 24 hours. Not adopted.
+
+Same day, 10,000 one-year paths rebuilt from 10-day blocks of the six-year daily returns:
+
+| bot | bad year (1 in 20) | median year | great year (1 in 20) | losing year | typical worst drop | 1 in 10 years worse than |
+|---|---|---|---|---|---|---|
+| trend_2x | -26% | +32% | +186% | 23% | -25% | -37% |
+| rotation | -31% | +41% | +202% | 21% | -29% | -45% |
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.
