@@ -473,6 +473,19 @@ Same day, 10,000 one-year paths rebuilt from 10-day blocks of the six-year daily
 | trend_2x | -26% | +32% | +186% | 23% | -25% | -37% |
 | rotation | -31% | +41% | +202% | 21% | -29% | -45% |
 
+### Nov 3: relative value and today's Turbo over six years (Nov 2020 - Sep 2026)
+Binance futures 1h + funding for 47 coins: today's top 30 plus the big coins of 2021-22, dead ones included
+(LUNA, FTT, MATIC, EOS, ...). Live settings.
+
+| | total | per year | max drawdown | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 (to Sep) |
+|---|---|---|---|---|---|---|---|---|---|
+| rel_value, today's top 30 only | +8,741% | +113% | -46% | +227% | +6% | -2% | +215% | +140% | +113% |
+| **rel_value, 47 coins incl. dead ones** | **+7,090%** | **+106%** | **-56%** | +615% | +37% | -5% | +184% | +36% | +43% |
+| Turbo as configured now (RV + TA trend, 5x) | +1,437% | +59% | -34% | +301% | +22% | -3% | +63% | +16% | +36% |
+
+Relative value holds up over six years and is the strongest bot tested; including dead coins barely changes it.
+Not included: news (untestable) and carry (one year of data only).
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.
