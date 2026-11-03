@@ -435,16 +435,20 @@ class RelativeValue(Strategy):
                    "the 5 strongest and short the 5 weakest over the last 7 days (equal dollars each side, keep a "
                    "coin while it stays in the top/bottom 8). Skips coins whose move is extreme (more than 2 "
                    "standard deviations from the pack): crashed coins tend to bounce violently. Trades smaller (down to "
-                   "1/3 size) when its own daily swings are bigger than usual. Watched every hour: if the book loses "
+                   "1/3 size) when its own daily swings are bigger than usual. New longs only while BTC is above its "
+                   "100-day average (shorts always). Watched every hour: if the book loses "
                    "5% in a day it is cut in half until the next daily rebalance")
 
     def __init__(self, coins, mode="residual", lookback_d=3, beta_d=30, n_side=5, gross_lev=2.0, hold_band=3,
                  funding=None, sizing="equal", max_z=None, leg_stop_k=None, vol_scale=False, breaker_pct=None,
-                 breaker_action="half"):
+                 breaker_action="half", long_frac=1.0, long_regime_d=None, long_confirm=False):
+        """Long-side options (Nov 3 tests): long_frac scales long legs; long_regime_d: new longs only while
+        BTC is above its N-day average; long_confirm: new longs only if yesterday was an up day too."""
         self.coins = coins
         self.p = dict(mode=mode, lookback_d=lookback_d, beta_d=beta_d, n_side=n_side, gross_lev=gross_lev,
                       hold_band=hold_band, sizing=sizing, max_z=max_z, leg_stop_k=leg_stop_k, vol_scale=vol_scale,
-                      breaker_pct=breaker_pct, breaker_action=breaker_action)
+                      breaker_pct=breaker_pct, breaker_action=breaker_action, long_frac=long_frac,
+                      long_regime_d=long_regime_d, long_confirm=long_confirm)
         if breaker_pct:
             self.every_h = 1                                   # watch the book every hour
         self.funding = funding
@@ -582,15 +586,21 @@ class RelativeValue(Strategy):
         held_l = sum(1 for p in br.acct["positions"].values() if p["side"] > 0)
         held_s = sum(1 for p in br.acct["positions"].values() if p["side"] < 0)
         k = n + (self.p["hold_band"] if blocked else 0)     # skipped extremes -> take the next in line
-        for side, names in ((1, ranked[:k]), (-1, ranked[::-1][:k])):
+        longs_ok = True
+        if self.p["long_regime_d"] and self.btc:
+            i, m = self.btc.at(T), self.p["long_regime_d"]
+            longs_ok = i >= m and self.btc.b[i]["c"] > sum(b["c"] for b in self.btc.b[i - m + 1:i + 1]) / m
+        for side, names in ((1, ranked[:k] if longs_ok else []), (-1, ranked[::-1][:k])):
             for c in names:
                 if (held_l if side > 0 else held_s) >= n:
                     break
                 if br.position(c) or c not in br.px or c in blocked:
                     continue
+                if side > 0 and self.p["long_confirm"] and (self._ret(self.d[c], T, 1) or 0) <= 0:
+                    continue
                 k = self.p["leg_stop_k"]
                 stop_dist = min(0.5, k * vols[c]) if k and vols.get(c) else 0.5     # default: disaster stop only
-                if br.market(c, side, leg * self._size(c, T, vols) / br.px[c], T, stop=br.px[c] * (1 - side * stop_dist),
+                if br.market(c, side, leg * self._size(c, T, vols) * (self.p["long_frac"] if side > 0 else 1.0) / br.px[c], T, stop=br.px[c] * (1 - side * stop_dist),
                              setup=f"RV {self.p['mode']}",
                              note=f"score {sc[c]:+.4f}", signal_t=T, track_r=False):
                     if side > 0:

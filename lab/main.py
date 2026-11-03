@@ -38,7 +38,8 @@ PARAMS = {
     # Oct 17: 7-day lookback + skip extreme movers (|z| > 2) after the Oct 15 short squeeze; see BACKTEST.md
     # Oct 18: + volatility targeting (shrinks new legs when the book is swinging more than usual)
     "rel_value": dict(mode="momentum", lookback_d=7, n_side=5, hold_band=3, gross_lev=2.0, max_z=2.0, vol_scale=True,
-                      breaker_pct=5.0, breaker_action="half"),   # Oct 19: hourly circuit breaker, see BACKTEST.md
+                      breaker_pct=5.0, breaker_action="half",    # Oct 19: hourly circuit breaker, see BACKTEST.md
+                      long_regime_d=100),                         # Nov 3: new longs only while BTC > its 100-day average
 }
 
 

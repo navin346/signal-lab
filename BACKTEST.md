@@ -486,6 +486,23 @@ Binance futures 1h + funding for 47 coins: today's top 30 plus the big coins of 
 Relative value holds up over six years and is the strongest bot tested; including dead coins barely changes it.
 Not included: news (untestable) and carry (one year of data only).
 
+### Nov 3: cutting relative value's long-side losses (adopted: BTC 100-day filter on new longs)
+Same 47 coins, six years. Over the whole period the long side made the money (+$44k of trade P&L) and the short side
+lost (-$8.6k), so shrinking longs hurts. Only a market filter improved both halves:
+
+| variant | 2020-22 | 2023-26 | all | max drawdown |
+|---|---|---|---|---|
+| live before | +235%/yr | +56%/yr | +106%/yr | -56% |
+| longs half size | +108% | +29% | +53% | -45% |
+| per-leg stop at 3x daily vol | +160% | +43% | +78% | -64% |
+| longs only if yesterday was up | +334% | +49% | +120% | -56% |
+| legs sized by volatility | +285% | +44% | +106% | -50% |
+| new longs only while BTC > 50-day average | +270% | +81% | +135% | -52% |
+| **new longs only while BTC > 100-day average (live from Nov 3)** | **+283%** | **+65%** | **+124%** | **-37%** |
+
+Turbo as configured (RV + TA trend, 5x) with the filter: +67%/yr, max drawdown -25% (before: +59%, -34%). BTC stayed
+above its 100-day average throughout Oct 12 - Nov 3, so the filter would not have changed the live losses so far.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

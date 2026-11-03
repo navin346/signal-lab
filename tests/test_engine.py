@@ -387,6 +387,25 @@ def test_trend_2x_is_ta_trend_at_double_risk():
     assert b.name == "trend_2x" and a.name == "ta_trend" and b.p["risk_pct"] == 2 * a.p["risk_pct"]
 
 
+def test_rel_value_longs_only_in_btc_uptrend():
+    from lab import strategies as S
+    D = 24 * HOUR
+    def daily(prices):
+        return [bar(i * D + h * HOUR, p, p, p, p) for i, p in enumerate(prices) for h in range(24)]
+    coins = ["BTC"] + [f"C{i}" for i in range(12)]
+    for btc, longs in (([100 + i for i in range(120)], True), ([220 - i for i in range(120)], False)):
+        data = {"BTC": daily(btc)}
+        for i in range(12):
+            data[f"C{i}"] = daily([100 * (1 + (i - 6) * 0.004) ** k for k in range(120)])
+        rv = S.RelativeValue(coins, mode="momentum", lookback_d=7, n_side=3, hold_band=0, long_regime_d=100)
+        rv.prepare(data)
+        acct, log = engine.new_account(500.0), []
+        br = engine.Broker("rel_value", acct, {c: data[c][-1]["c"] for c in coins}, log)
+        rv._rebalance(120 * D, br)
+        sides = [p["side"] for p in acct["positions"].values()]
+        assert sides.count(-1) == 3 and sides.count(1) == (3 if longs else 0)
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
