@@ -45,17 +45,19 @@ PARAMS = {
 
 def build(top30, held_rv):
     rv_coins = list(dict.fromkeys(top30 + held_rv))
-    return [S.MarketStructure(universe.DIRECTIONAL, **PARAMS["ms_struct"]),
-            S.RelativeValue(rv_coins, **PARAMS["rel_value"]),
-            S.NewsRegime(universe.DIRECTIONAL, **PARAMS["news_regime"]),
-            S.TATrend(universe.DIRECTIONAL, **PARAMS["ta_trend"])]
+    return [S.RelativeValue(rv_coins, **PARAMS["rel_value"]), S.TATrend(universe.DIRECTIONAL, **PARAMS["ta_trend"])]
 
 
-BOTS = ["ms_struct", "rel_value", "news_regime", "ta_trend"]       # the watcher learns from these
-ACTIVE = BOTS + ["carry", "watcher", "turbo", "trend_2x", "rotation"]
+BOTS = ["rel_value", "ta_trend"]
+ACTIVE = BOTS + ["carry", "turbo", "trend_2x", "rotation"]
+# Nov 3: retired (positions closed, history kept). Six years: ms_struct -78%; news_regime never traded without the
+# paid AI analyst; the watcher only re-sized the other bots' trades and learning did not help in the backtest.
+RETIRED_V2 = {"ms_struct": "lost 78% over the six-year backtest (every coin negative)",
+              "news_regime": "never traded: needs the paid AI news analyst",
+              "watcher": "copied the other bots at 1x; its learning added nothing in the backtest"}
 # Oct 30 (six-year backtest, BACKTEST.md): market structure lost on every coin over 2020-2026, so Turbo stops copying
 # it (the bot itself keeps running on paper); TA trend at 2% risk and a BTC/gold rotation run as their own accounts.
-TURBO_SOURCES = ["rel_value", "news_regime", "ta_trend"]
+TURBO_SOURCES = ["rel_value", "ta_trend"]
 # Oct 24 ("option A", BACKTEST.md): Turbo at 5x, volatility target 1.25%/day, plus the carry bot copied on half
 # of Turbo's money. Engine backtest: $500 -> $2,343, max drawdown -14.3%, worst day -8.3% (Turbo alone at 3x:
 # $1,907, -13.9%). Options B (4x, 1.25%: $2,217, -12.8%) and C (4x, 1.0%) are calmer points on the same curve.
@@ -64,7 +66,7 @@ TURBO_RISK = dict(brake_dd=1.0, vol_target=0.0125, dd_start=0.12, dd_budget=0.25
 TURBO_CARRY_SHARE = 0.5
 DESCRIPTIONS = {
     "watcher": W.Watcher.description,
-    "turbo": (f"Turbo (growth): copies the relative-value, news and TA bots (not market structure since Oct 30), each on a third of its "
+    "turbo": (f"Turbo (growth): copies the relative-value and TA trend bots, each on a third of its "
               f"money at {TURBO_LEV:.0f}x, plus the funding-carry bot on {TURBO_CARRY_SHARE:.0%} of its money (no extra "
               f"leverage, never trimmed). "
               f"Shrinks the directional copies when its own daily swings exceed {TURBO_RISK['vol_target']:.2%}, and "
@@ -102,10 +104,6 @@ def migrate(state, marks_legacy, now):
     """v1 -> v2: retire the naive v1 bots (close their positions, keep their history), add the
     four research bots with fresh $500 accounts, keep the two controls running."""
     if state.get("version") == 2:
-        if "watcher" not in state["accounts"]:            # v2 -> v2 + watcher
-            state["accounts"]["watcher"] = engine.new_account(C.START_EQUITY)
-            state["watcher_started"] = now
-            state["watcher_backfill"] = True
         if "turbo" not in state["accounts"]:              # + turbo
             state["accounts"]["turbo"] = engine.new_account(C.START_EQUITY)
             state["turbo_started"] = now
@@ -233,6 +231,18 @@ def tick():
     bots = build(top30, held_rv)
     for b in bots:
         b.prepare(data)
+    for s, why in RETIRED_V2.items():                     # Nov 3: close and archive the retired bots
+        acct = state["accounts"].pop(s, None)
+        if acct is None:
+            continue
+        px = {c: data[c][-1]["c"] for c in acct["positions"] if c in data}
+        br = engine.Broker(s, acct, px, state["trades"], booked=now)
+        for c in list(acct["positions"]):
+            if c in px:
+                br.close(c, now, "bot retired")
+        state.setdefault("retired", {})[s] = {
+            "equity": round(engine.equity(acct, px), 2), "retired_at": now,
+            "trades": sum(1 for t in state["trades"] if t["strategy"] == s), "description": f"Retired Nov 3: {why}."}
     # funding carry: pairs listed on Hyperliquid and Aster (prices, funding history, current rates)
     held_pairs = list(state["accounts"]["carry"]["mem"].get("pairs", {}))
     pairs, book, cdata, cfund, cmarks = carry.build_live(ctx, data, held_pairs, errors)
@@ -240,18 +250,6 @@ def tick():
     marks.update(cmarks)
     cb = carry.FundingCarry(pairs, book)
     ctx = {"news": lambda coin, T: analyst.view(nitems, coin, T)}
-    wt = W.Watcher(BOTS, {s: state["accounts"][s] for s in BOTS}, state["trades"], list(data),
-                   funding=lambda c, t: funding.get(c))
-    wt.prepare(data)
-    wt.ctx = ctx
-    if state.pop("watcher_backfill", False):              # stamp conditions on trades made before it existed
-        for t in state["trades"]:
-            if t["strategy"] in BOTS and t.get("ctx") is None:
-                t["ctx"] = wt.context(t["strategy"], t["asset"], t.get("signal_t") or t["opened"],
-                                      1 if t["side"] == "long" else -1)
-        for s in BOTS:
-            for c, p in state["accounts"][s]["positions"].items():
-                p.setdefault("ctx", wt.context(s, c, p.get("signal_t") or p["opened"], p["side"]))
     accts = {s: state["accounts"][s] for s in ACTIVE}
     def fund_fn(c, t):                                   # carry legs: their own funding history
         return cfund(c, t) if c.startswith(("hlc:", "ast:")) else funding.get(c, 0.0)
@@ -265,15 +263,14 @@ def tick():
     extra = [S.TrendBig(universe.DIRECTIONAL, **dict(PARAMS["ta_trend"], risk_pct=2.0)), S.Rotation()]
     for b in extra:
         b.prepare(data)
-    engine.run(bots + extra + [cb, wt, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
-               context_fn=wt.context)
+    engine.run(bots + extra + [cb, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
+               context_fn=tb.context)
     state["carry_view"] = {"pairs": len(pairs), "held": state["accounts"]["carry"]["mem"].get("pairs", {}),
                            "next": (t_to // HOUR // cb.p["rebalance_h"] + 1) * cb.p["rebalance_h"] * HOUR,
                            "top_gaps": sorted(([p["sym"], round(g, 1)] for p in pairs
                                                if (g := book.mean_gap(p["sym"], t_to, 168)) is not None),
                                               key=lambda x: -abs(x[1]))[:10]}
     state["engine_T"] = t_to
-    state["watcher_report"] = wt.report(t_to)
 
     # ---- controls (unchanged from v1): daily coin flip / always long on the six v1 markets
     for s in CONTROLS:
@@ -305,7 +302,7 @@ def tick():
     held_now = {c for s in ACTIVE for c in state["accounts"][s]["positions"]}
     state["marks"] = {c: marks[c] for c in set(universe.DIRECTIONAL) | set(top30) | held_now if c in marks}
     state["marks_legacy"] = marks_legacy
-    state["regimes"] = regimes(bots, t_to)
+    state["regimes"] = regimes(data, bots, t_to)
     for c, row in state["regimes"].items():
         sc, cf = analyst.view(nitems, c, t_to)
         row["news"] = round(sc * cf, 3)
@@ -313,11 +310,13 @@ def tick():
     return state
 
 
-def regimes(bots, T):
-    """What each directional bot sees right now, per market (for the dashboard)."""
+def regimes(data, bots, T):
+    """What the market looks like right now, per market (for the dashboard). The structure and regime
+    readings come from the retired bots' indicators, kept as a view only."""
     out = {}
-    ms = next(b for b in bots if b.name == "ms_struct")
-    nr = next(b for b in bots if b.name == "news_regime")
+    ms, nr = S.MarketStructure(universe.DIRECTIONAL, **PARAMS["ms_struct"]), S.NewsRegime(universe.DIRECTIONAL)
+    ms.prepare(data)
+    nr.prepare(data)
     ta = next(b for b in bots if b.name == "ta_trend")
     for c in universe.DIRECTIONAL:
         row = {}
@@ -415,9 +414,8 @@ def write(state):
         "curve": [p for p in state["curve"] if p["t"] >= v2][::max(1, len(state["curve"]) // 1500)],
         "positions": {s: state["accounts"][s]["positions"] for s in ACTIVE + CONTROLS},
         "orders": {s: state["accounts"][s].get("orders", {}) for s in ACTIVE},
-        "watcher": state.get("watcher_report"), "watcher_started": state.get("watcher_started"),
         "carry": state.get("carry_view"), "carry_started": state.get("carry_started"),
-        "started": {s: state.get(f"{s}_started") for s in ("watcher", "turbo", "carry", "trend_2x", "rotation")},
+        "started": {s: state.get(f"{s}_started") for s in ("turbo", "carry", "trend_2x", "rotation")},
         "turbo": {"started": state.get("turbo_started"), "lev": TURBO_LEV,
                   "peak": state["accounts"]["turbo"]["mem"].get("peak"),
                   "liquidations": state["accounts"]["turbo"]["mem"].get("liquidations", 0)},
