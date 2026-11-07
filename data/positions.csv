@@ -1,0 +1,49 @@
+strategy,asset,hyperliquid_market,side,setup,opened_utc,entry_price,stop_price,partial_target,target_price,mark_now,funding_usd_so_far,note
+coin_flip,BTC,BTC,long,,2026-11-07 00:54:52,75929.8,74411.2,,77448.4,75816,-0.0473,
+coin_flip,ETH,ETH,short,,2026-11-07 00:54:52,2240.55,2285.36,,2195.74,2236,0.0474,
+coin_flip,SOL,SOL,short,,2026-11-07 00:54:52,90.203,92.007,,88.3989,89.616,0.008,
+coin_flip,GOLD,xyz:GOLD,long,,2026-11-07 00:54:52,4079.42,3997.83,,4161,4074.9,-0.0237,
+coin_flip,OIL,xyz:CL,short,,2026-11-07 00:54:52,89.937,91.7357,,88.1383,90.206,0.0905,
+coin_flip,NASDAQ,xyz:XYZ100,long,,2026-11-07 00:54:52,27028.4,26487.8,,27569,26982,-0.0236,
+buy_hold,BTC,BTC,long,,2026-11-06 00:13:52,76143.2,74620.4,,77666.1,75816,-0.1014,
+buy_hold,ETH,ETH,long,,2026-11-06 00:13:52,2238.15,2193.38,,2282.91,2236,-0.1018,
+buy_hold,SOL,SOL,long,,2026-11-07 00:54:52,90.239,88.4343,,92.0438,89.616,-0.0072,
+buy_hold,GOLD,xyz:GOLD,long,,2026-11-07 00:54:52,4079.42,3997.83,,4161,4074.9,-0.0213,
+buy_hold,OIL,xyz:CL,long,,2026-11-07 00:54:52,89.973,88.1735,,91.7725,90.206,-0.0816,
+buy_hold,NASDAQ,xyz:XYZ100,long,,2026-11-07 00:54:52,27028.4,26487.8,,27569,26982,-0.0213,
+rel_value,kPEPE,kPEPE,long,RV momentum,2026-10-26 00:00:00,0.00427986,0.0021395,,,0.004878,-0.3011,score -0.0647
+rel_value,SOL,SOL,short,RV momentum,2026-11-01 00:00:00,95.3839,143.105,,,89.616,0.1196,score +0.0702
+rel_value,XMR,XMR,long,RV momentum,2026-11-03 00:00:00,605.551,302.715,,,610.4,-0.7742,score -0.0103
+rel_value,NEAR,NEAR,short,RV momentum,2026-11-03 00:00:00,3.86443,5.7978,,,3.6706,0.1215,score +0.1538
+rel_value,TAO,TAO,short,RV momentum,2026-11-03 00:00:00,223.195,334.86,,,224.11,0.0999,score +0.1190
+rel_value,ENA,ENA,short,RV momentum,2026-11-06 00:00:00,0.160108,0.24021,,,0.15839,0.0474,score +0.0907
+rel_value,HYPE,HYPE,short,RV momentum,2026-11-07 00:00:00,78.4733,117.734,,,77.638,0.0197,score +0.1365
+ta_trend,xyz:XYZ100,xyz:XYZ100,short,donchian 50/200 cross,2026-11-05 16:00:00,26867.6,27355.1,,,26982,0.0795,ADX 28
+ta_trend,XRP,XRP,short,donchian 50/200 cross,2026-11-06 08:00:00,1.18526,1.2065,,,1.1621,0.0301,ADX 26
+turbo,hlc:WLFI,hlc:WLFI,long,copy of carry: carry leg (Hyperliquid),2026-10-25 00:00:00,0.0531446,0.026567,,,0.046074,-0.1228,fixed 50% share
+turbo,ast:WLFIUSDT,ast:WLFIUSDT,short,copy of carry: carry leg (Aster),2026-10-25 00:00:00,0.0531894,0.0798,,,0.04617,1.029,fixed 50% share
+turbo,kPEPE,kPEPE,long,copy of rel_value: RV momentum,2026-10-26 00:00:00,0.00427986,0.0021395,,,0.004878,-0.3671,learning (38/20 trades): copied at 1x
+turbo,hlc:XMR,hlc:XMR,short,copy of carry: carry leg (Hyperliquid),2026-10-28 00:00:00,608.468,912.885,,,610.4,1.1249,fixed 50% share
+turbo,ast:XMRUSDT,ast:XMRUSDT,long,copy of carry: carry leg (Aster),2026-10-28 00:00:00,607.802,303.84,,,610.215,-0.5366,fixed 50% share
+turbo,SOL,SOL,short,copy of rel_value: RV momentum,2026-11-01 00:00:00,95.3839,143.105,,,89.616,0.0453,learning (47/20 trades): copied at 1x
+turbo,XMR,XMR,long,copy of rel_value: RV momentum,2026-11-03 00:00:00,605.551,302.715,,,610.4,-0.1998,learning (51/20 trades): copied at 1x
+turbo,NEAR,NEAR,short,copy of rel_value: RV momentum,2026-11-03 00:00:00,3.86443,5.7978,,,3.6706,0.0321,learning (51/20 trades): copied at 1x
+turbo,TAO,TAO,short,copy of rel_value: RV momentum,2026-11-03 00:00:00,223.195,334.86,,,224.11,0.0268,learning (51/20 trades): copied at 1x
+turbo,hlc:kPEPE,hlc:kPEPE,short,copy of carry: carry leg (Hyperliquid),2026-11-03 00:00:00,0.00477205,0.0071595,,,0.004878,0.0276,fixed 50% share
+turbo,ast:1000PEPEUSDT,ast:1000PEPEUSDT,long,copy of carry: carry leg (Aster),2026-11-03 00:00:00,0.00477806,0.00238855,,,0.00488175,-0.173,fixed 50% share
+turbo,hlc:ASTER,hlc:ASTER,long,copy of carry: carry leg (Hyperliquid),2026-11-03 00:00:00,0.697469,0.348665,,,0.68285,-0.0842,fixed 50% share
+turbo,ast:ASTERUSDT,ast:ASTERUSDT,short,copy of carry: carry leg (Aster),2026-11-03 00:00:00,0.69816,1.04745,,,0.683741,0.1827,fixed 50% share
+turbo,xyz:XYZ100,xyz:XYZ100,short,copy of ta_trend: donchian 50/200 cross,2026-11-05 16:00:00,26867.6,27355.1,,,26982,0.0203,learning (22/20 trades): copied at 1x
+turbo,ENA,ENA,short,copy of rel_value: RV momentum,2026-11-06 00:00:00,0.160108,0.24021,,,0.15839,0.0124,learning (59/20 trades): copied at 1x
+turbo,XRP,XRP,short,copy of ta_trend: donchian 50/200 cross,2026-11-06 08:00:00,1.18526,1.2065,,,1.1621,0.0081,learning (23/20 trades): copied at 1x
+turbo,HYPE,HYPE,short,copy of rel_value: RV momentum,2026-11-07 00:00:00,78.4733,117.734,,,77.638,0.0053,learning (63/20 trades): copied at 1x
+carry,hlc:WLFI,hlc:WLFI,long,carry leg (Hyperliquid),2026-10-25 00:00:00,0.0531446,0.026567,,,0.046074,-0.2564,7-day funding gap +30% a year (Aster minus Hyperliquid)
+carry,ast:WLFIUSDT,ast:WLFIUSDT,short,carry leg (Aster),2026-10-25 00:00:00,0.0531894,0.0798,,,0.04617,2.1484,7-day funding gap +30% a year (Aster minus Hyperliquid)
+carry,hlc:XMR,hlc:XMR,short,carry leg (Hyperliquid),2026-10-28 00:00:00,608.468,912.885,,,610.4,2.2577,7-day funding gap -27% a year (Aster minus Hyperliquid)
+carry,ast:XMRUSDT,ast:XMRUSDT,long,carry leg (Aster),2026-10-28 00:00:00,607.802,303.84,,,610.215,-1.077,7-day funding gap -27% a year (Aster minus Hyperliquid)
+carry,hlc:kPEPE,hlc:kPEPE,short,carry leg (Hyperliquid),2026-11-03 00:00:00,0.00477205,0.0071595,,,0.004878,0.0644,7-day funding gap -23% a year (Aster minus Hyperliquid)
+carry,ast:1000PEPEUSDT,ast:1000PEPEUSDT,long,carry leg (Aster),2026-11-03 00:00:00,0.00477806,0.00238855,,,0.00488175,-0.403,7-day funding gap -23% a year (Aster minus Hyperliquid)
+carry,hlc:ASTER,hlc:ASTER,long,carry leg (Hyperliquid),2026-11-03 00:00:00,0.697469,0.348665,,,0.68285,-0.1961,7-day funding gap +22% a year (Aster minus Hyperliquid)
+carry,ast:ASTERUSDT,ast:ASTERUSDT,short,carry leg (Aster),2026-11-03 00:00:00,0.69816,1.04745,,,0.683741,0.4256,7-day funding gap +22% a year (Aster minus Hyperliquid)
+trend_2x,xyz:XYZ100,xyz:XYZ100,short,donchian 50/200 cross,2026-11-05 16:00:00,26867.6,27355.1,,,26982,0.174,ADX 28
+trend_2x,XRP,XRP,short,donchian 50/200 cross,2026-11-06 08:00:00,1.18526,1.2065,,,1.1621,0.0656,ADX 26
