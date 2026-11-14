@@ -503,6 +503,34 @@ lost (-$8.6k), so shrinking longs hurts. Only a market filter improved both halv
 Turbo as configured (RV + TA trend, 5x) with the filter: +67%/yr, max drawdown -25% (before: +59%, -34%). BTC stayed
 above its 100-day average throughout Oct 12 - Nov 3, so the filter would not have changed the live losses so far.
 
+### Nov 14: the squeeze fade is a one-minute trade (fast lane started, paper)
+Re-test of the Oct 28 candidate on 85 Binance perps, Nov 2024 - Nov 2026 (hourly candles, hourly open interest, funding;
+5m and 1m candles for execution). Rule: at an hourly close, the hour's rise is in the top 20% of hours (in units of the
+coin's 72h volatility) and the open-interest change is in the bottom 20%. Short. Thresholds fitted on year 1
+(z > 0.70, open interest < -0.905%). Costs 13 bps on majors, 20 bps elsewhere, plus funding.
+
+**The Oct 28 version does not hold.** Held 4 hours it lost in the fresh year (Nov 2024 - Nov 2025: -2 bps a trade at
+80/20, -94 bps at 90/10), and its apparent profit came from selling at the exact hourly close:
+
+| sell N minutes after the hour, buy back at the next hour | year 1 (990 signals, 30 coins) | year 2 (702) |
+|---|---|---|
+| 0 (the close itself, not achievable) | +24.9 bps | +26.9 bps |
+| 1 | +15.6 | +17.7 |
+| 2 | +6.9 | +10.9 |
+| 3 | -0.5 | +3.7 |
+| 5 | -10.3 | -8.7 |
+
+The price falls about 35 bps in the five minutes after such an hour, steadily (about 7-9 bps a minute), in both years.
+Sold one minute after the hour, any buy-back between 5 and 60 minutes later was positive in both years (t-stats
+2.3-4.0); 60 minutes was best. About 5-8 signals a day across 85 coins. The mirror trade (buy) loses 37-67 bps.
+
+What this is: a real but thin and fast effect. It earns ~35 bps before costs against an assumed 20 bps of costs, so the
+answer depends on the real spread in those minutes, which candles cannot show. `lab/fast.py` tests exactly that: an
+always-on paper bot on Hyperliquid (chained GitHub Actions runs, state on the `fast-data` branch) that sells at the
+impact bid within seconds of the hour, buys back at the impact ask an hour later, pays 4.5 bps a side and funding, and
+logs for every signal what selling 1, 2 and 5 minutes later, or buying back after 5, 15 and 30 minutes, would have made.
+Hyperliquid's own open interest replaces Binance's in the signal. Verdict after ~200 signals (roughly a month).
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

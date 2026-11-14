@@ -406,6 +406,47 @@ def test_rel_value_longs_only_in_btc_uptrend():
         assert sides.count(-1) == 3 and sides.count(1) == (3 if longs else 0)
 
 
+def test_fast_lane_squeeze_fade_lifecycle():
+    from lab import fast as F
+    T = 1000 * HOUR
+    def ctx(mid, oi, spread=0.0004, funding=0.0001):
+        return {"X": {"mid": mid, "bid": mid * (1 - spread / 2), "ask": mid * (1 + spread / 2), "oi": oi, "vol": 5e6,
+                      "funding": funding}}
+    bot = F.Fast()
+    closes = [100 * (1 + 0.01 * (-1) ** i) for i in range(75)] + [100.0]        # ~1% hourly swings, last close 100
+    bot.set_history("X", closes, T - HOUR)
+    assert not bot.on_poll(T - HOUR + 3000, ctx(100.0, 1e7)) and not bot.s["open"]   # first snapshot: nothing to compare
+    bot.on_poll(T - 30 * 60_000, ctx(101.0, 1e7))
+    bot.on_poll(T + 4000, ctx(102.0, 0.98e7))                                    # +2% hour, open interest -2%: sell
+    g = bot.s["open"][0]
+    assert g["taken"] and abs(g["e"] - 102.0 * 0.9998) < 1e-9 and g["size"] == 500.0 and g["z"] > 0.7
+    bot.on_poll(T + 70_000, ctx(101.8, 0.98e7))
+    bot.on_poll(T + 6 * 60_000, ctx(101.5, 0.98e7))
+    assert g["shadow"]["60"] == 101.8 * 0.9998 and g["path"]["5"] == 101.5 * 1.0002
+    done = bot.on_poll(T + HOUR + 2000, ctx(101.0, 0.98e7))                      # an hour later: buy back at the ask
+    x = 101.0 * 1.0002
+    assert done and abs(done[0]["pnl"] - ((g["e"] - x) / g["e"] - 2 * F.FEE + 0.0001)) < 1e-12
+    assert abs(bot.s["equity"] - 500 * (1 + done[0]["pnl"])) < 1e-9 and not bot.s["open"]
+    st = bot.stats()
+    assert st["signals"] == 1 and st["entry_now"]["avg_bps"] > 70 and st["by_delay"]["60"]["n"] == 1
+    quiet = F.Fast()                                                             # same hour, open interest rising: no trade
+    quiet.set_history("X", closes, T - HOUR)
+    quiet.on_poll(T - HOUR + 3000, ctx(100.0, 1e7))
+    quiet.on_poll(T + 4000, ctx(102.0, 1.02e7))
+    assert not quiet.s["open"]
+    late = F.Fast()                                                              # snapshot arrives too late: hour skipped
+    late.set_history("X", closes, T - HOUR)
+    late.on_poll(T - HOUR + 3000, ctx(100.0, 1e7))
+    late.on_poll(T + 5 * 60_000, ctx(102.0, 0.98e7))
+    assert not late.s["open"] and late.s["skipped"] == 2
+    stop = F.Fast()
+    stop.set_history("X", closes, T - HOUR)
+    stop.on_poll(T - HOUR + 3000, ctx(100.0, 1e7))
+    stop.on_poll(T + 4000, ctx(102.0, 0.98e7))
+    done = stop.on_poll(T + 10 * 60_000, ctx(111.0, 0.98e7))                     # keeps squeezing: disaster stop
+    assert done and done[0]["stop"] and done[0]["pnl"] < -0.08
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

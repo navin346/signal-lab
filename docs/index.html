@@ -96,6 +96,15 @@
   </div>
 
   <div class="card">
+    <h2>Fast lane: squeeze fade (live test)</h2>
+    <p class="note">A separate bot that stays on. When a coin jumps within an hour while open bets on it shrink, it sells
+      within seconds of the hour and buys back an hour later, at real Hyperliquid bid and ask prices, fees included.
+      Paper only. The question it answers: is the profit bigger than the real cost? <span id="faststatus"></span></p>
+    <div class="scroll"><table id="fasttab"></table></div>
+    <div class="scroll" style="margin-top:10px"><table id="fastrecent"></table></div>
+  </div>
+
+  <div class="card">
     <h2>Money over time</h2>
     <div class="chart-box"><canvas id="equity" aria-label="Equity per bot over time" role="img"></canvas></div>
     <div class="legend" id="legend"></div>
@@ -384,6 +393,19 @@ $("theme").addEventListener("click", () => {
   const next = dark ? "light" : "dark"; applyTheme(next); try { localStorage.setItem("signal-lab-theme", next); } catch (e) {}
 });
 // On GitHub Pages the data sits next to this page; anywhere else (e.g. Vercel) read it from the gh-pages branch.
+const RAWFAST = "https://raw.githubusercontent.com/navin346/signal-lab/fast-data/fast.json";
+function fast(f){
+  if (!f || !f.stats) { $("faststatus").textContent = "Not started yet."; return; }
+  const st = f.stats, live = Date.now() - f.heartbeat < 30 * 60000;
+  $("faststatus").textContent = (live ? "Running" : "Not running") + ", last seen " + when(f.heartbeat) + ". Watched " + st.hours + " hours so far.";
+  const r = (name, a) => [{t:name, c:"l"}, a ? a.n : 0, a ? {t: sgn(a.avg_bps/100, 2) + "%", c: a.avg_bps > 0 ? "pos" : "neg"} : "–", a ? fmt(a.win_pct, 0) + "%" : "–"];
+  fill("fasttab", [{t:"Per trade, after fees",c:"l"}, "Trades", "Average result", "Winners"], [
+    r("Sell at once, buy back after 1 hour (the bot's account: $" + fmt(st.equity) + ")", st.entry_now),
+    r("…if it had sold 1 minute later", st.by_delay["60"]), r("…2 minutes later", st.by_delay["120"]), r("…5 minutes later", st.by_delay["300"]),
+    r("Sell at once, buy back after 5 minutes", st.by_exit["5"]), r("…after 15 minutes", st.by_exit["15"]), r("…after 30 minutes", st.by_exit["30"])]);
+  fill("fastrecent", ["When", {t:"Coin",c:"l"}, "Hour's rise", "Open bets", "Spread", "Result"], (f.done||[]).slice(-12).reverse().map(g =>
+    [when(g.t0), {t: g.coin + (g.taken ? "" : " (watched only)"), c:"l"}, "×" + fmt(g.z, 1), fmt(g.doi, 1) + "%", fmt(g.spread_bps/100, 2) + "%", pc(g.pnl * 100)]));
+}
 const RAW = "https://raw.githubusercontent.com/navin346/signal-lab/gh-pages/data/summary.json";
 const RAWBT = "https://raw.githubusercontent.com/navin346/signal-lab/gh-pages/backtest.json";
 const onPages = location.hostname.endsWith("github.io");
@@ -393,6 +415,7 @@ async function load(list){ for (const u of list) { try { const r = await fetch(u
   const d = await load(onPages ? ["data/summary.json", RAW] : [RAW, "data/summary.json"]);
   if (d && d.version === 2) render(d);
   else $("errors").replaceChildren(el("div", "Waiting for the first run of the new bots to publish data.", "err"));
+  try { fast(await load([RAWFAST])); } catch (e) { $("faststatus").textContent = "No data yet."; }
 })();
 </script>
 </body>
