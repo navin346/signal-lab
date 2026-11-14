@@ -569,6 +569,33 @@ More risk per trade did not add money beyond 2% and nearly emptied the account o
 over the six years ($7,400 paid in) ended at about $14,300 with the live rule. The four readings were chosen after
 seeing all six years, so expect less live. ETF flows: no free history to test; not included.
 
+### Nov 14: "moonshot" tests on every listed perp, and the on-chain scout (paper)
+Owner's goal: $100 (plus $100 a month) to $50k in one to two years, any means: memecoins, narratives, on-chain.
+
+**Listed coins (baseline).** All 888 Binance USDT perps that ever traded (19 delisted), 1h candles and funding, Jan 2023 -
+Oct 2026. Daily: enter coins closing at a 30-day high (or low) on 2x their usual volume, most extreme surge first, up
+to 3 positions, sized to lose X% of the account at a 2 ATR stop, 3 ATR trail, 0.15% a side, funding paid. $100 at the
+start and every 30 days; one run per starting month (32 twelve-month runs, 20 twenty-four-month runs; they overlap).
+
+| rule | 12 months ($1,200 in): median end | 24 months ($2,400 in): median end | reached $50k |
+|---|---|---|---|
+| buy breakouts, 10% risk | $501 | $459 | never |
+| buy breakouts, 20% risk | $140 | $146 | never |
+| buy breakouts, 20% risk, pyramiding | $6 | $6 | never |
+| buy breakouts and short breakdowns, 20% risk | $170 | $143 | never |
+| short the pumps, 10% risk | $827 | $1,649 | never |
+| buy the panics (30-day low on a surge), 10% risk | $730 | $1,073 | never |
+| short pumps and buy panics together, 10% risk | $1,284 | $7,401 | 2 of 20 runs (not robust: each half alone loses) |
+
+Breakout buys won 22% of the time. Chasing or fading volume breakouts on coins that are already listed does not do it.
+
+**On-chain (`lab/scout.py`).** No honest backtest is possible: dead and scam pools vanish from free data. The scout
+collects the evidence forward instead. Every 15 minutes (inside the always-on `fast` workflow) it reads trending and
+top-volume pools on Solana, Robinhood Chain, Base and BSC from GeckoTerminal, keeps pools with $150k+ liquidity, $500k+
+daily volume, volume under 40x liquidity (wash-trading filter), 24h+ age, 300+ buyers and 150+ sellers in a day, $1M-$1B
+valuation, and (a) logs each one and its price 1, 6, 24, 72 and 168 hours later, (b) paper-buys those up 20-300% on the
+day and still rising: 5% of the account each, 30% stop, 35% trail after +50%, 7 days, 1% a side.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

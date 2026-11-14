@@ -96,6 +96,16 @@
   </div>
 
   <div class="card">
+    <h2>On-chain scout (live test)</h2>
+    <p class="note">Scans the trending and busiest pools on Solana, Robinhood Chain, Base and BSC every 15 minutes, drops fake
+      or thin ones, and paper-buys coins already running (+20% to +300% on the day) with 5% of its account each: 30% stop,
+      trailing stop once up 50%, 7 days at most, 1% cost per side. Paper only; it cannot tell whether a coin can really be
+      sold. <span id="scoutstatus"></span></p>
+    <div class="scroll"><table id="scouttab"></table></div>
+    <div class="scroll" style="margin-top:10px"><table id="scoutopen"></table></div>
+  </div>
+
+  <div class="card">
     <h2>Fast lane: squeeze fade (live test)</h2>
     <p class="note">A separate bot that stays on. When a coin jumps within an hour while open bets on it shrink, it sells
       within seconds of the hour and buys back an hour later, at real Hyperliquid bid and ask prices, fees included.
@@ -394,6 +404,20 @@ $("theme").addEventListener("click", () => {
   const next = dark ? "light" : "dark"; applyTheme(next); try { localStorage.setItem("signal-lab-theme", next); } catch (e) {}
 });
 // On GitHub Pages the data sits next to this page; anywhere else (e.g. Vercel) read it from the gh-pages branch.
+const RAWSCOUT = "https://raw.githubusercontent.com/navin346/signal-lab/fast-data/scout.json";
+function scoutCard(f){
+  if (!f || !f.stats) { $("scoutstatus").textContent = "Not started yet."; return; }
+  const st = f.stats, live = Date.now() - f.heartbeat < 45 * 60000, NET = {solana:"Solana", robinhood:"Robinhood", base:"Base", bsc:"BSC"};
+  $("scoutstatus").textContent = (live ? "Running" : "Not running") + ", last scan " + when(f.heartbeat) + ". Account $" + fmt(st.equity + st.open_value) +
+    ", " + st.closed + " trades closed" + (st.closed ? " (" + st.win_pct + "% winners, average " + sgn(st.avg_pnl_pct, 1) + "%)" : "") + ".";
+  const r = (name, a) => [{t:name, c:"l"}, a ? a.n : 0, a ? pc(a.avg_pct, 1) : "–", a ? a.up_pct + "%" : "–", a ? a.x2_pct + "%" : "–"];
+  fill("scouttab", [{t:"What happened to the coins it logged (" + st.logged + " so far)", c:"l"}, "Coins", "Average move", "Went up", "Doubled"], [
+    r("All coins that passed the filters, 1 day later", st.all["24"]), r("…3 days later", st.all["72"]), r("…7 days later", st.all["168"]),
+    r("Only the ones it bought, 1 day later", st.bought["24"]), r("…3 days later", st.bought["72"]), r("…7 days later", st.bought["168"])]);
+  const rows = Object.values(f.open || {}).map(g => [when(g.t), {t: g.sym, c:"l"}, NET[g.net] || g.net, "$" + fmt(g.size), pc(g.now * 100, 1), "open"])
+    .concat((f.done || []).slice(-10).reverse().map(g => [when(g.t), {t: g.sym, c:"l"}, NET[g.net] || g.net, "$" + fmt(g.size), pc(g.pnl * 100, 1), g.why]));
+  fill("scoutopen", ["Bought", {t:"Coin", c:"l"}, "Chain", "Size", "Result", "Status"], rows);
+}
 const RAWFAST = "https://raw.githubusercontent.com/navin346/signal-lab/fast-data/fast.json";
 function fast(f){
   if (!f || !f.stats) { $("faststatus").textContent = "Not started yet."; return; }
@@ -417,6 +441,7 @@ async function load(list){ for (const u of list) { try { const r = await fetch(u
   if (d && d.version === 2) render(d);
   else $("errors").replaceChildren(el("div", "Waiting for the first run of the new bots to publish data.", "err"));
   try { fast(await load([RAWFAST])); } catch (e) { $("faststatus").textContent = "No data yet."; }
+  try { scoutCard(await load([RAWSCOUT])); } catch (e) { $("scoutstatus").textContent = "No data yet."; }
 })();
 </script>
 </body>

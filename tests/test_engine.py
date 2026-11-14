@@ -470,6 +470,36 @@ def test_confluence_trades_with_the_trend_and_sizes_by_risk():
         assert p["side"] == side and abs(p["qty"] * abs(p["entry"] - p["stop"]) - 5.0) < 0.2      # the stop costs ~1% of $500
 
 
+def test_onchain_scout_filters_fakes_and_manages_a_paper_trade():
+    from lab import scout as SC
+    now = 2000 * 24 * HOUR
+    def pool(i, **kw):
+        p = {"id": f"solana_{i}", "net": "solana", "addr": i, "name": f"{i} / SOL", "sym": i, "px": 1.0, "fdv": 5e6,
+             "liq": 300_000.0, "vol24": 2e6, "vol1": 1e5, "h1": 5.0, "h6": 20.0, "h24": 60.0, "buyers": 2000,
+             "sellers": 1500, "buys": 9000, "sells": 6000, "created": now - 10 * 24 * HOUR}
+        p.update(kw)
+        return p
+    assert SC.qualifies(pool("GOOD"), now)
+    for bad in (dict(liq=1000.0), dict(vol24=5e7), dict(created=now - 2 * HOUR), dict(sellers=3), dict(sym="WETH"),
+                dict(fdv=5e9), dict(sells=100)):                       # thin, wash-traded, brand new, unsellable, major...
+        assert not SC.qualifies(pool("BAD", **bad), now)
+    bot = SC.Scout()
+    pools = {p["id"]: p for p in (pool("RUN"), pool("FLAT", h24=2.0), pool("FAKE", liq=0.0))}
+    bot.step(now, pools, {i: (p["px"], p["liq"]) for i, p in pools.items()})
+    assert set(bot.s["watch"]) == {"solana_RUN", "solana_FLAT"} and set(bot.s["open"]) == {"solana_RUN"}
+    assert bot.s["open"]["solana_RUN"]["size"] == 25.0                # 5% of $500
+    bot.step(now + HOUR, {}, {"solana_RUN": (2.0, 300_000.0), "solana_FLAT": (0.9, 300_000.0)})   # doubles
+    assert bot.s["watch"]["solana_RUN"]["marks"]["1"] == 1.0 and bot.s["open"]
+    bot.step(now + 2 * HOUR, {}, {"solana_RUN": (1.25, 300_000.0)})   # -37.5% from the peak: trailing stop
+    g = bot.s["done"][0]
+    assert g["why"] == "trailing stop" and abs(g["pnl"] - (1.25 * 0.99 / 1.01 - 1)) < 1e-4
+    assert abs(bot.s["equity"] - (500 + 25 * g["pnl"])) < 1e-9
+    rug = SC.Scout()
+    rug.step(now, {"solana_RUN": pool("RUN")}, {"solana_RUN": (1.0, 300_000.0)})
+    rug.step(now + HOUR, {}, {"solana_RUN": (0.8, 20_000.0)})         # liquidity pulled
+    assert rug.s["done"][0]["why"] == "liquidity pulled" and rug.s["done"][0]["pnl"] < -0.55
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

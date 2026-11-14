@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from lab import market  # noqa: E402
+from lab import market, scout  # noqa: E402
 
 HOUR = 3_600_000
 Z_MIN, DOI_MAX = 0.70, -0.905          # the 80th / 20th percentiles of Nov 2024 - Nov 2025, all coins pooled
@@ -144,13 +144,13 @@ def feed():
     return out
 
 
-def publish(path):
-    """Force-push the state file as the only commit on the fast-data branch (read by the dashboard)."""
+def publish(*paths):
+    """Force-push the state files as the only commit on the fast-data branch (read by the dashboard)."""
     def git(*a, **kw):
         return subprocess.run(["git", *a], capture_output=True, text=True, check=True, timeout=120, **kw).stdout.strip()
     try:
-        blob = git("hash-object", "-w", str(path))
-        tree = git("mktree", input=f"100644 blob {blob}\tfast.json\n")
+        tree = git("mktree", input="".join(f"100644 blob {git('hash-object', '-w', str(p))}\t{Path(p).name}\n"
+                                           for p in paths if Path(p).exists()))
         commit = git("-c", "user.name=signal-lab-bot", "-c", "user.email=signal-lab-bot@users.noreply.github.com",
                      "commit-tree", tree, "-m", "fast")
         git("push", "-q", "--force", "origin", f"{commit}:refs/heads/fast-data")
@@ -164,7 +164,7 @@ def save(bot, path):
     Path(path).write_text(json.dumps(out, separators=(",", ":")))
 
 
-def run(minutes, path):
+def run(minutes, path, scout_path=None):
     state = None
     if Path(path).exists():
         try:
@@ -174,7 +174,8 @@ def run(minutes, path):
         except json.JSONDecodeError:
             state = None
     bot = Fast(state)
-    t_end, queue, refreshed, last_pub = time.time() + minutes * 60, [], None, 0.0
+    t_end, queue, refreshed, last_pub, last_scout = time.time() + minutes * 60, [], None, 0.0, 0.0
+    out = [path] + ([scout_path] if scout_path else [])
     while True:
         try:
             ctx = feed()
@@ -197,18 +198,24 @@ def run(minutes, path):
             except Exception as e:
                 print("history failed:", c, str(e)[:80], flush=True)
         queue = queue[2:]
+        fresh = any(now - g["t0"] < 6 * 60_000 for g in bot.s["open"])
+        if scout_path and time.time() - last_scout > 900 and 3 * 60_000 < into < 55 * 60_000 and not fresh and not queue:
+            try:                                                   # the on-chain scout shares this always-on process
+                scout.cycle(scout_path)
+            except Exception as e:
+                print("scout failed:", str(e)[:120], flush=True)
+            last_scout, last_pub = time.time(), 0.0
         if closed or time.time() - last_pub > 600:
             save(bot, path)
             if os.environ.get("FAST_PUBLISH"):
-                publish(path)
+                publish(*out)
             last_pub = time.time()
         if time.time() > t_end and 20 * 60_000 <= into < 45 * 60_000:     # hand over away from the hour mark
             save(bot, path)
             if os.environ.get("FAST_PUBLISH"):
-                publish(path)
+                publish(*out)
             return
         near_mark = into > HOUR - 15_000 or into < 20_000
-        fresh = any(now - g["t0"] < 6 * 60_000 for g in bot.s["open"])
         time.sleep(2 if near_mark else 3 if (fresh or queue) else 10)
 
 
@@ -216,5 +223,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--minutes", type=float, default=290)
     ap.add_argument("--state", default="fast.json")
+    ap.add_argument("--scout", default=None, help="state file of the on-chain scout (lab/scout.py); omit to skip it")
     a = ap.parse_args()
-    run(a.minutes, a.state)
+    run(a.minutes, a.state, a.scout)

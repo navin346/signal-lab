@@ -1,4 +1,5 @@
 # Fast lane: a paper bot that stays on and reacts within seconds of each hour (lab/fast.py).
+# The same process runs the on-chain scout (lab/scout.py) every 15 minutes.
 # Each run lasts about five hours, then starts the next one. State lives on the fast-data branch.
 name: fast
 on:
@@ -7,7 +8,7 @@ on:
   workflow_dispatch: {}
   push:
     branches: [main]
-    paths: ["lab/fast.py", ".github/workflows/fast.yml"]
+    paths: ["lab/fast.py", "lab/scout.py", ".github/workflows/fast.yml"]
 
 permissions:
   contents: write
@@ -32,11 +33,12 @@ jobs:
         run: |
           if git fetch --depth 1 origin fast-data 2>/dev/null; then
             git show FETCH_HEAD:fast.json > fast.json || rm -f fast.json
+            git show FETCH_HEAD:scout.json > scout.json 2>/dev/null || rm -f scout.json
           fi
       - name: run
         env:
           FAST_PUBLISH: "1"
-        run: python -m lab.fast --minutes 290 --state fast.json
+        run: python -m lab.fast --minutes 290 --state fast.json --scout scout.json
       - name: start the next run
         if: success() || failure()
         env:
