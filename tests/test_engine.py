@@ -500,6 +500,29 @@ def test_onchain_scout_filters_fakes_and_manages_a_paper_trade():
     assert rug.s["done"][0]["why"] == "liquidity pulled" and rug.s["done"][0]["pnl"] < -0.55
 
 
+def test_trend_pro_picks_and_entry_filter():
+    from lab import strategies as S
+    daily = {c: [{"c": 100.0}] * 50 + [{"c": 100.0 * m}] * 51 for c, m in (("A", 1.5), ("B", 0.7), ("C", 1.2), ("BTC", 3.0))}
+    picks, table = S.trending_large_caps(daily, ["BTC"], slots=2, look=90)
+    assert picks == ["A", "C"] and table[-1] == ["B", -30.0]                 # strongest risers; the core is excluded
+    bot = S.TrendPro(["X"], mode="donchian", fast=50, slow=200, adx_min=0.0, atr_mult=2.0, risk_pct=3.0)
+    bars, p = [], 100.0
+    for i in range(24 * 60):
+        o = p
+        p *= 1.0008
+        bars.append({"t": i * HOUR, "o": o, "h": p * 1.001, "l": o * 0.999, "c": p, "v": 1e6})
+    T = 24 * 60 * HOUR
+    bot.prepare({"X": bars})
+    for allowed, n in ((set(), 0), ({"X"}, 1)):
+        bot.allowed = allowed
+        acct = engine.new_account(500.0)
+        br = engine.Broker("trend_pro", acct, {"X": p}, [])
+        bot.step(T, br, {})
+        assert len(acct["positions"]) == n
+    pos = acct["positions"]["X"]
+    assert abs(pos["qty"] * abs(pos["entry"] - pos["stop"]) - 15.0) < 0.5        # the stop costs 3% of $500
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

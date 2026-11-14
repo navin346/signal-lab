@@ -232,6 +232,8 @@ class TATrend(Strategy):
                    "confirms a trend; 2 ATR trailing stop, exit on the opposite breakout, 1% risk. Picked over "
                    "4H EMA crossovers by the backtest")
 
+    allowed = None        # if set: new trades only in these markets (open trades elsewhere are still managed)
+
     def __init__(self, coins, fast=21, slow=55, adx_min=20.0, atr_mult=3.0, risk_pct=1.0, mode="ema",
                  exit_on_cross=True, max_open=8):
         self.coins = coins
@@ -275,7 +277,7 @@ class TATrend(Strategy):
                 if self.p["exit_on_cross"] and sig == -p["side"]:
                     br.close(c, T, "opposite crossover")
                     p = None
-            if p or sig == 0:
+            if p or sig == 0 or (self.allowed is not None and c not in self.allowed):
                 continue
             if self.p["adx_min"] and (d["adx"][i] or 0) < self.p["adx_min"]:
                 continue
@@ -294,6 +296,26 @@ class TrendBig(TATrend):
     description = ("Trend 2x: exactly the TA trend bot's rules (4H breakout of the ~33-day high/low with ADX, 2 ATR "
                    "trailing stop) at 2% risk per trade instead of 1%. Six-year backtest: +37% a year, every year "
                    "positive, worst drop -43%")
+
+
+class TrendPro(TATrend):
+    """Trend Pro (Nov 15): the TA-trend rule on a short list of big markets (BTC, ETH, SOL, gold, Nasdaq) plus
+    two rotating slots for the large caps with the strongest 90-day rise, at 3% risk a trade. Backtest
+    Apr 2023 - Oct 2026: $500 -> $2,870, worst drop -38%. See BACKTEST.md."""
+    name = "trend_pro"
+    description = ("Trend Pro: the TA trend rule (4H breakout of the ~33-day high/low with ADX, 2 ATR trailing stop) on "
+                   "BTC, ETH, SOL, gold and the Nasdaq, plus the two large caps with the strongest 90-day rise "
+                   "(re-picked daily). 3% of the account risked per trade; positions use leverage up to 5x in total. "
+                   "Stops opening trades if it ever falls 50% from its peak. Backtest since Apr 2023: +474%, worst "
+                   "drop -38%")
+
+
+def trending_large_caps(daily, exclude, slots=2, look=90):
+    """daily: {coin: [daily candles]} for the large caps. Returns the `slots` coins with the biggest rise over
+    `look` days, and the full table [(coin, % move)] for the dashboard."""
+    mv = [(c, b[-1]["c"] / b[-1 - look]["c"] - 1) for c, b in daily.items() if c not in exclude and len(b) > look]
+    mv.sort(key=lambda x: -x[1])
+    return [c for c, _ in mv[:slots]], [[c, round(r * 100, 1)] for c, r in mv]
 
 
 class Rotation(Strategy):

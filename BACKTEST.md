@@ -596,6 +596,46 @@ daily volume, volume under 40x liquidity (wash-trading filter), 24h+ age, 300+ b
 valuation, and (a) logs each one and its price 1, 6, 24, 72 and 168 hours later, (b) paper-buys those up 20-300% on the
 day and still rising: 5% of the account each, 30% stop, 35% trail after +50%, 7 days, 1% a side.
 
+### Nov 15: Trend 2x reviewed; Trend Pro (live on paper)
+Binance futures 1h, every USDT perp (888, dead ones included), fees, slippage, funding. Rule = live `ta_trend`
+(4H Donchian 200, ADX 20, 2 ATR trail).
+
+**Trend 2x as live (12 crypto + gold, oil, Nasdaq proxies), Jul 2024 - Oct 2026, 2% risk:** $500 -> $1,340 (+168%), max
+drawdown -38%, Sharpe 0.94; 453 positions, 38% winners, average win 2.0x average loss; the 10 best trades made more
+than the whole profit; longest losing streak 17; 194 days under water; longs +$769, shorts +$55.
+
+**By market group, same rule, same period:** majors (BTC ETH SOL XRP BNB) +141% / -29%; 27 smaller alts -35% / -77%;
+20 memecoins -33% / -55%; 18 tokenized stocks (2026 only) -50% / -61%; 5 commodities (2026 only) -2% / -23%.
+Six years (Nov 2020 - Oct 2026), the five majors at 2%: +739%, -29%, every year positive (+54 +30 +66 +15 +22 +84).
+
+**"When to stop" and "learning" (tested on three universes and on six years):**
+
+| idea | result |
+|---|---|
+| pause while the rule's own equity is below its 30/60-day average | worse everywhere (six years: +33% vs +739%) |
+| no new trades when BTC is choppy (30-day efficiency ratio) or near its 100-day average | worse |
+| trade only markets (or asset classes) where the rule made money over the last 180/365 days | worse in every test |
+| trade only the N most-traded markets (N = 3..20) | worse than a fixed list of majors |
+| at most 3-4 crypto trades in one direction | lower drawdown, lower return: neutral |
+| pause after 5-6 losers in a row | slightly better on majors, much worse on another list (+176% vs +355%): noise, dropped |
+
+**Market list at 3% risk, Apr 2023 - Oct 2026** (gold = PAXG from Mar 2025, Nasdaq = QQQ from Apr 2026):
+
+| list | Apr23-Jun24 | Jul24-Oct26 | all | max drawdown |
+|---|---|---|---|---|
+| BTC ETH SOL XRP BNB + gold | +126% | +308% | +824% | -36% |
+| BTC ETH SOL HYPE ZEC + gold + Nasdaq (owner's list) | +74% | +161% | +355% | -30% (ZEC -$149, HYPE -$178) |
+| BTC ETH SOL + gold + Nasdaq | +63% | +195% | +380% | -29% |
+| core + the 2 large caps with the biggest 90-day move, up or down | +58% | +127% | +258% | -46% |
+| **core + the 2 large caps with the strongest 90-day rise (live)** | **+59%** | **+261%** | **+474%** | **-38%** |
+| core + 4 such | +76% | +229% | +478% | -42% |
+
+"Large cap" in the backtest = the 15 most-traded crypto perps over the last 30 days; live it is the 15 biggest by
+market cap. The XRP/BNB list is today's top five, so it carries hindsight; the rotating rule does not.
+
+**Live (`trend_pro`):** core BTC, ETH, SOL, gold, Nasdaq + two rotating large caps, 3% risk a trade, positions capped at
+5x each and 5x in total, no pause rule; stops opening trades for good if equity falls 50% below its peak.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

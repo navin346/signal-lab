@@ -49,7 +49,11 @@ def build(top30, held_rv):
 
 
 BOTS = ["rel_value", "ta_trend"]
-ACTIVE = BOTS + ["carry", "turbo", "trend_2x", "rotation", "confluence"]
+ACTIVE = BOTS + ["carry", "turbo", "trend_2x", "rotation", "confluence", "trend_pro"]
+# Nov 15: Trend Pro. The trend rule made money on the biggest markets and lost on small coins, memecoins and stocks
+# (BACKTEST.md), so: a fixed core plus two slots for the large caps (15 biggest by market cap) trending up most.
+TREND_PRO = dict(core=["BTC", "ETH", "SOL", "xyz:GOLD", "xyz:XYZ100"], slots=2, top=15, look_d=90, risk_pct=3.0,
+                 kill_dd=0.50)
 # Nov 14: the chart reader. Of eight chart readings tested alone over six years, four made money in both halves
 # (price vs the 100/200 EMA, and the 9/21 EMA on 4H, 12H, and 20/50 on the daily); it trades when 3 of those 4
 # agree, each trade sized so that its stop costs 1% of the account. See BACKTEST.md.
@@ -76,7 +80,7 @@ DESCRIPTIONS = {
               f"Shrinks the directional copies when its own daily swings exceed {TURBO_RISK['vol_target']:.2%}, and "
               f"keeps shrinking them if it falls 12%+ below its peak. Backtest: $500 -> $2,343, worst drop -14.3%"),
     "carry": carry.FundingCarry.description,
-    "trend_2x": S.TrendBig.description, "rotation": S.Rotation.description,
+    "trend_2x": S.TrendBig.description, "rotation": S.Rotation.description, "trend_pro": S.TrendPro.description,
     "confluence": ("Chart reader: reads each chart four ways (price vs the 100/200 EMA on 4H; the 9/21 EMA on 4H and "
                    "12H; the 20/50 EMA on the daily) and trades when at least three agree, long or short, up to five "
                    "markets at once. Each trade is sized so that its stop (2.5 ATR, then trailed) costs 1% of the "
@@ -118,7 +122,7 @@ def migrate(state, marks_legacy, now):
         if "carry" not in state["accounts"]:              # + funding carry (Oct 24)
             state["accounts"]["carry"] = engine.new_account(C.START_EQUITY)
             state["carry_started"] = now
-        for s in ("trend_2x", "rotation", "confluence"):    # + trend 2x and rotation (Oct 30), chart reader (Nov 14)
+        for s in ("trend_2x", "rotation", "confluence", "trend_pro"):   # Oct 30, Nov 14 (chart reader), Nov 15
             if s not in state["accounts"]:
                 state["accounts"][s] = engine.new_account(C.START_EQUITY)
                 state[f"{s}_started"] = now
@@ -209,6 +213,26 @@ def tick():
 
     data = fetch(universe.DIRECTIONAL, top30 + held_rv, errors)
 
+    # ---- Trend Pro's rotating slots: the large caps with the strongest 90-day rise (daily)
+    tp = state.setdefault("trend_pro_view", {"picks": [], "table": [], "day": None, "peak": C.START_EQUITY, "killed": False})
+    if tp.get("day") != day:
+        daily = {}
+        for c in [x for x in top30 if x not in TREND_PRO["core"]][:TREND_PRO["top"]]:
+            try:
+                daily[c] = market.candles(c, TREND_PRO["look_d"] + 10, "1d", pause=0.3)
+            except Exception as e:
+                errors[f"trend_pro:{c}"] = str(e)[:100]
+        if len(daily) >= 5:
+            tp["picks"], tp["table"] = S.trending_large_caps(daily, TREND_PRO["core"], TREND_PRO["slots"], TREND_PRO["look_d"])
+            tp["day"] = day
+    held_tp = list(state["accounts"].get("trend_pro", {}).get("positions", {}))
+    for c in tp["picks"] + held_tp:                     # the trend rule needs the long hourly history
+        if c not in data or len(data[c]) < 24 * 60:
+            try:
+                data[c] = market.candles(c, 24 * 200, "1h")
+            except Exception as e:
+                errors[f"candles:{c}"] = str(e)[:120]
+
     # ---- news: fetch -> AI analyst (or keyword fallback) -> items; keep learning the keyword matrix
     try:
         items, nerr = news.fetch_headlines()
@@ -269,7 +293,14 @@ def tick():
     tb.prepare(data)
     tb.ctx = ctx
     cf = S.Confluence(universe.DIRECTIONAL, **CONFLUENCE)
-    extra = [S.TrendBig(universe.DIRECTIONAL, **dict(PARAMS["ta_trend"], risk_pct=2.0)), S.Rotation(), cf]
+    tpa = state["accounts"]["trend_pro"]
+    tp_eq = engine.equity(tpa, {c: data[c][-1]["c"] for c in tpa["positions"] if c in data})
+    tp["peak"] = max(tp.get("peak", C.START_EQUITY), tp_eq)
+    tp["killed"] = tp.get("killed") or tp_eq < tp["peak"] * (1 - TREND_PRO["kill_dd"])      # stays off once tripped
+    tpb = S.TrendPro(list(dict.fromkeys(TREND_PRO["core"] + tp["picks"] + held_tp)),
+                     **dict(PARAMS["ta_trend"], risk_pct=TREND_PRO["risk_pct"]))
+    tpb.allowed = set() if tp["killed"] else set(TREND_PRO["core"] + tp["picks"])
+    extra = [S.TrendBig(universe.DIRECTIONAL, **dict(PARAMS["ta_trend"], risk_pct=2.0)), S.Rotation(), cf, tpb]
     for b in extra:
         b.prepare(data)
     engine.run(bots + extra + [cb, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
@@ -431,7 +462,8 @@ def write(state):
         "positions": {s: state["accounts"][s]["positions"] for s in ACTIVE + CONTROLS},
         "orders": {s: state["accounts"][s].get("orders", {}) for s in ACTIVE},
         "carry": state.get("carry_view"), "carry_started": state.get("carry_started"),
-        "started": {s: state.get(f"{s}_started") for s in ("turbo", "carry", "trend_2x", "rotation", "confluence")},
+        "started": {s: state.get(f"{s}_started") for s in ("turbo", "carry", "trend_2x", "rotation", "confluence", "trend_pro")},
+        "trend_pro": state.get("trend_pro_view"),
         "turbo": {"started": state.get("turbo_started"), "lev": TURBO_LEV,
                   "peak": state["accounts"]["turbo"]["mem"].get("peak"),
                   "liquidations": state["accounts"]["turbo"]["mem"].get("liquidations", 0)},
