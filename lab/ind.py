@@ -16,7 +16,8 @@ def resample(bars, hours):
         if cur is None or cur["t"] != k:
             if cur is not None and cur["n"] == hours:
                 out.append(cur)
-            cur = {"t": k, "o": b["o"], "h": b["h"], "l": b["l"], "c": b["c"], "n": 0}
+            cur = {"t": k, "o": b["o"], "h": b["h"], "l": b["l"], "c": b["c"], "v": 0.0, "n": 0}
+        cur["v"] += b.get("v", 0.0)
         cur["h"] = max(cur["h"], b["h"])
         cur["l"] = min(cur["l"], b["l"])
         cur["c"] = b["c"]

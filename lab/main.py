@@ -49,7 +49,11 @@ def build(top30, held_rv):
 
 
 BOTS = ["rel_value", "ta_trend"]
-ACTIVE = BOTS + ["carry", "turbo", "trend_2x", "rotation"]
+ACTIVE = BOTS + ["carry", "turbo", "trend_2x", "rotation", "confluence"]
+# Nov 14: the chart reader. Of eight chart readings tested alone over six years, four made money in both halves
+# (price vs the 100/200 EMA, and the 9/21 EMA on 4H, 12H, and 20/50 on the daily); it trades when 3 of those 4
+# agree, each trade sized so that its stop costs 1% of the account. See BACKTEST.md.
+CONFLUENCE = dict(need=3, votes=["trend", "fast", "half-day", "daily"], risk_pct=1.0, gross=10.0, max_open=5)
 # Nov 3: retired (positions closed, history kept). Six years: ms_struct -78%; news_regime never traded without the
 # paid AI analyst; the watcher only re-sized the other bots' trades and learning did not help in the backtest.
 RETIRED_V2 = {"ms_struct": "lost 78% over the six-year backtest (every coin negative)",
@@ -73,6 +77,10 @@ DESCRIPTIONS = {
               f"keeps shrinking them if it falls 12%+ below its peak. Backtest: $500 -> $2,343, worst drop -14.3%"),
     "carry": carry.FundingCarry.description,
     "trend_2x": S.TrendBig.description, "rotation": S.Rotation.description,
+    "confluence": ("Chart reader: reads each chart four ways (price vs the 100/200 EMA on 4H; the 9/21 EMA on 4H and "
+                   "12H; the 20/50 EMA on the daily) and trades when at least three agree, long or short, up to five "
+                   "markets at once. Each trade is sized so that its stop (2.5 ATR, then trailed) costs 1% of the "
+                   "account. Six-year backtest: +38% a year, every year positive, worst drop -56%"),
     "ms_struct": S.MarketStructure.description, "rel_value": S.RelativeValue.description,
     "news_regime": S.NewsRegime.description, "ta_trend": S.TATrend.description,
     "coin_flip": signals.DESCRIPTIONS["coin_flip"], "buy_hold": signals.DESCRIPTIONS["buy_hold"],
@@ -110,7 +118,7 @@ def migrate(state, marks_legacy, now):
         if "carry" not in state["accounts"]:              # + funding carry (Oct 24)
             state["accounts"]["carry"] = engine.new_account(C.START_EQUITY)
             state["carry_started"] = now
-        for s in ("trend_2x", "rotation"):                  # + trend 2x and rotation (Oct 30)
+        for s in ("trend_2x", "rotation", "confluence"):    # + trend 2x and rotation (Oct 30), chart reader (Nov 14)
             if s not in state["accounts"]:
                 state["accounts"][s] = engine.new_account(C.START_EQUITY)
                 state[f"{s}_started"] = now
@@ -260,7 +268,8 @@ def tick():
     tb.fixed_share = {"carry": TURBO_CARRY_SHARE}        # carry on half the money, no leverage, never trimmed
     tb.prepare(data)
     tb.ctx = ctx
-    extra = [S.TrendBig(universe.DIRECTIONAL, **dict(PARAMS["ta_trend"], risk_pct=2.0)), S.Rotation()]
+    cf = S.Confluence(universe.DIRECTIONAL, **CONFLUENCE)
+    extra = [S.TrendBig(universe.DIRECTIONAL, **dict(PARAMS["ta_trend"], risk_pct=2.0)), S.Rotation(), cf]
     for b in extra:
         b.prepare(data)
     engine.run(bots + extra + [cb, tb], accts, data, fund_fn, t_from, t_to, state["trades"], ctx=ctx, booked=now,
@@ -303,6 +312,13 @@ def tick():
     state["marks"] = {c: marks[c] for c in set(universe.DIRECTIONAL) | set(top30) | held_now if c in marks}
     state["marks_legacy"] = marks_legacy
     state["regimes"] = regimes(data, bots, t_to)
+    allv = S.Confluence(universe.DIRECTIONAL)                       # all eight readings, for the dashboard
+    allv.prepare(data)
+    t4 = t_to // (4 * HOUR) * (4 * HOUR)
+    for c in allv.d:
+        v = allv.votes(c, t4)
+        if v is not None:
+            state["regimes"].setdefault(c, {})["votes"] = v
     for c, row in state["regimes"].items():
         sc, cf = analyst.view(nitems, c, t_to)
         row["news"] = round(sc * cf, 3)
@@ -415,7 +431,7 @@ def write(state):
         "positions": {s: state["accounts"][s]["positions"] for s in ACTIVE + CONTROLS},
         "orders": {s: state["accounts"][s].get("orders", {}) for s in ACTIVE},
         "carry": state.get("carry_view"), "carry_started": state.get("carry_started"),
-        "started": {s: state.get(f"{s}_started") for s in ("turbo", "carry", "trend_2x", "rotation")},
+        "started": {s: state.get(f"{s}_started") for s in ("turbo", "carry", "trend_2x", "rotation", "confluence")},
         "turbo": {"started": state.get("turbo_started"), "lev": TURBO_LEV,
                   "peak": state["accounts"]["turbo"]["mem"].get("peak"),
                   "liquidations": state["accounts"]["turbo"]["mem"].get("liquidations", 0)},

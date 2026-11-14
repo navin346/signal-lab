@@ -447,6 +447,29 @@ def test_fast_lane_squeeze_fade_lifecycle():
     assert done and done[0]["stop"] and done[0]["pnl"] < -0.08
 
 
+def test_confluence_trades_with_the_trend_and_sizes_by_risk():
+    from lab import strategies as S
+    def series(drift):
+        out, p = [], 100.0
+        for i in range(24 * 120):
+            o = p
+            p *= 1 + drift + 0.004 * (1 if i % 2 else -1)
+            out.append({"t": i * HOUR, "o": o, "h": max(o, p) * 1.001, "l": min(o, p) * 0.999, "c": p, "v": 1e6})
+        return out
+    T = 24 * 120 * HOUR
+    for drift, side in ((0.0006, 1), (-0.0006, -1)):
+        bot = S.Confluence(["X"], need=3, votes=["trend", "fast", "half-day", "daily"], risk_pct=1.0, gross=10.0, max_open=5)
+        data = {"X": series(drift)}
+        bot.prepare(data)
+        v = bot.votes("X", T)
+        assert sum(v.values()) * side >= 3 and set(v) == {"trend", "fast", "half-day", "daily"}
+        acct, log = engine.new_account(500.0), []
+        br = engine.Broker("confluence", acct, {"X": data["X"][-1]["c"]}, log)
+        bot.step(T, br, {})
+        p = acct["positions"]["X"]
+        assert p["side"] == side and abs(p["qty"] * abs(p["entry"] - p["stop"]) - 5.0) < 0.2      # the stop costs ~1% of $500
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

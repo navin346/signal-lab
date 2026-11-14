@@ -531,6 +531,44 @@ impact bid within seconds of the hour, buys back at the impact ask an hour later
 logs for every signal what selling 1, 2 and 5 minutes later, or buying back after 5, 15 and 30 minutes, would have made.
 Hyperliquid's own open interest replaces Binance's in the signal. Verdict after ~200 signals (roughly a month).
 
+### Nov 14: the chart reader (confluence of chart readings; live on paper)
+Owner's brief: read the higher and lower timeframes, combine several readings (structure, EMAs and crossovers on
+several timeframes, volume vs price, RSI divergence), trade hard when they agree, wait otherwise.
+Binance futures 1h with volume, 10 coins (BTC ETH SOL XRP BNB DOGE ADA AVAX LINK LTC), Nov 2020 - Nov 2026, halves
+split at Nov 2023. Eight readings vote +1 / -1 / 0 at each 4H close; 2.5 ATR stop, 3 ATR trail, exit when the score
+turns against the trade.
+
+**1. Fixed position size (2.5x equity = 50% margin at 5x) wipes the account out** in every variant (need 4-7 of 8;
+1, 2 or 3 trades): about 35% winners, and a 2.5 ATR stop at that size costs 5-19% of the account each time.
+
+**2. Each reading alone** (1% of equity risked per trade, up to 5 trades):
+
+| reading | 2020-23 | 2023-26 | all | max drawdown | winners | avg win / avg loss |
+|---|---|---|---|---|---|---|
+| price vs 100/200 EMA (4H) | +75%/yr | +35%/yr | +54%/yr | -43% | 36% | 2.1 |
+| 9/21 EMA with slope (4H) | +69% | +27% | +46% | -53% | 32% | 2.3 |
+| 9/21 EMA (12H) | +44% | +30% | +37% | -44% | 37% | 1.9 |
+| 20/50 EMA (daily) | +19% | +25% | +22% | -67% | 37% | 1.8 |
+| 4H swings (lower lows / higher highs) | +21% | -29% | -8% | -80% | 40% | 1.5 |
+| 9/21 EMA (1H) | +7% | -19% | -7% | -75% | 31% | 2.2 |
+| volume vs price (follow strong-volume moves, fade thin ones) | -31% | -16% | -24% | -90% | 43% | 1.3 |
+| RSI divergence | -19% | -1% | -11% | -75% | 37% | 1.6 |
+
+**3. Combined.** All eight voting (need 3-5): +37-39%/yr, -44% drawdown: no better than the best reading alone.
+The four that worked in both halves, 1% risk, up to 5 trades:
+
+| rule | 2020-23 | 2023-26 | all | max drawdown | by year 2021-26 |
+|---|---|---|---|---|---|
+| 2 of 4 agree | +68% | +21% | +43% | -48% | +155 +32 +56 +15 +57 -20 |
+| **3 of 4 agree (live)** | **+49%** | **+27%** | **+38%** | **-56%** | **+209 +8 +17 +13 +25 +10** |
+| 4 of 4 agree | +43% | +24% | +33% | -54% | +199 -2 +1 +42 +5 +14 |
+| 3 of 4, 2% risk | +88% | +33% | +58% | -82% | +645 +4 +14 +2 +37 +1 |
+| 3 of 4, 3% risk | +105% | +19% | +56% | -94% | |
+
+More risk per trade did not add money beyond 2% and nearly emptied the account on the way. $100 plus $100 a month
+over the six years ($7,400 paid in) ended at about $14,300 with the live rule. The four readings were chosen after
+seeing all six years, so expect less live. ETF flows: no free history to test; not included.
+
 ## Known biases (read before trusting any number)
 1. **Universe chosen with today's information.** The directional list and the top-30 are today's biggest coins. That includes some of last year's big winners (ZEC, HYPE). This flatters trend and momentum strategies.
 2. **Spot prices for perps.** The directional backtest uses Binance spot candles; live trades Hyperliquid perps. Funding is real Hyperliquid funding.

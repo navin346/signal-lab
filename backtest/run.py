@@ -33,7 +33,7 @@ def load(path, coins, prefer=("bn_1h", "hl_1h")):
             if f.exists():
                 rows = json.loads(f.read_text())
                 if len(rows) > 500:
-                    data[c] = [{"t": r[0], "o": r[1], "h": r[2], "l": r[3], "c": r[4]} for r in rows]
+                    data[c] = [{"t": r[0], "o": r[1], "h": r[2], "l": r[3], "c": r[4], "v": r[5] if len(r) > 5 else 0.0} for r in rows]
                     src[c] = p
                     break
     return data, src

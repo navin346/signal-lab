@@ -339,6 +339,129 @@ class Rotation(Strategy):
                       note=f"{want} above its {self.days}-day average", signal_t=T, track_r=False)
 
 
+class Confluence(Strategy):
+    """Chart-reading bot (Nov 14): several independent readings of the same chart each cast a vote, and it
+    trades only when most of them agree, at leverage; otherwise it waits.
+
+    Votes, each +1 (up) / -1 (down) / 0, taken at every 4-hour close:
+      structure   4H swings: lower lows and lower highs (down) or higher highs and higher lows (up)
+      trend       price below both the 100 and 200 EMA (4H), or above both
+      fast        9 EMA below the 21 EMA and falling (4H), or above and rising
+      daily       20 EMA vs 50 EMA on the daily chart
+      half-day    9 EMA vs 21 EMA on the 12-hour chart
+      hourly      9 EMA vs 21 EMA on the 1-hour chart (timing)
+      volume      the last day's move came on above-median volume (follow it) or on thin volume (a
+                  fake-out: vote against it)
+      RSI         divergence: price makes a higher high while RSI makes a lower one (down), or a lower
+                  low while RSI makes a higher one (up); counts for two days
+
+    Enter when at least `need` votes net agree. Stop `stop_atr` ATRs away, trailed by `trail_atr` ATRs;
+    also out when the score turns against the trade. Size: `gross` x equity, split over `max_open` trades."""
+    name, every_h = "confluence", 4
+    description = ("Chart reader: eight readings of each chart vote (4H structure, 100/200 EMA, 9/21 EMA on 1H, 4H, "
+                   "12H and daily, volume vs price, RSI divergence). It trades only when most agree, at leverage, "
+                   "with an ATR stop that trails; otherwise it waits")
+
+    def __init__(self, coins, need=5, gross=2.5, max_open=2, stop_atr=2.5, trail_atr=3.0, exit_score=-2, votes=None,
+                 risk_pct=None):
+        """risk_pct: size each trade so that its stop loses this % of equity (capped at gross / max_open),
+        instead of a fixed position size."""
+        self.coins = coins
+        self.p = dict(need=need, gross=gross, max_open=max_open, stop_atr=stop_atr, trail_atr=trail_atr,
+                      exit_score=exit_score, votes=votes, risk_pct=risk_pct)
+        self.d = {}
+
+    @staticmethod
+    def _state(fast, slow, i, slope=False):
+        if i < 1 or fast[i] is None or slow[i] is None:
+            return 0
+        s = 1 if fast[i] > slow[i] else -1
+        if slope and fast[i - 1] is not None and (fast[i] - fast[i - 1]) * s <= 0:
+            return 0
+        return s
+
+    def prepare(self, data):
+        for c in self.coins:
+            if c not in data or len(data[c]) < 24 * 60:
+                continue
+            h1, h4, h12, d1 = (frame(data[c], h) for h in (1, 4, 12, 24))
+            cl = [x["c"] for x in h4.b]
+            e = {n: ind.ema(cl, n) for n in (9, 21, 100, 200)}
+            rs = ind.rsi(cl, 14)
+            ph, pl = ind.pivots(h4.b, 3)
+            struct, div = [0] * len(cl), [0] * len(cl)
+            hs, ls, bear_until, bull_until = [], [], -1, -1
+            for i in range(len(cl)):
+                if ph[i]:
+                    j, px = ph[i]
+                    if hs and px > hs[-1][1] and rs[j] is not None and rs[hs[-1][0]] is not None and rs[j] < rs[hs[-1][0]]:
+                        bear_until = i + 12
+                    hs.append((j, px))
+                if pl[i]:
+                    j, px = pl[i]
+                    if ls and px < ls[-1][1] and rs[j] is not None and rs[ls[-1][0]] is not None and rs[j] > rs[ls[-1][0]]:
+                        bull_until = i + 12
+                    ls.append((j, px))
+                if len(hs) >= 2 and len(ls) >= 2:
+                    up = hs[-1][1] > hs[-2][1] and ls[-1][1] > ls[-2][1]
+                    dn = hs[-1][1] < hs[-2][1] and ls[-1][1] < ls[-2][1]
+                    struct[i] = 1 if up else -1 if dn else 0
+                div[i] = (1 if i <= bull_until else 0) - (1 if i <= bear_until else 0)
+            vol = [0] * len(cl)
+            v = [x.get("v", 0.0) for x in h4.b]
+            for i in range(60, len(cl)):
+                med = sorted(v[i - 59:i + 1])[30]
+                if med > 0:
+                    ratio, mv = sum(v[i - 5:i + 1]) / 6 / med, (1 if cl[i] > cl[i - 6] else -1)
+                    vol[i] = mv if ratio >= 1.0 else -mv if ratio < 0.8 else 0
+            c1, c12, cd = ([x["c"] for x in tf.b] for tf in (h1, h12, d1))
+            self.d[c] = {"h1": h1, "h4": h4, "h12": h12, "d1": d1, "e": e, "atr": ind.atr(h4.b, 14), "struct": struct,
+                         "div": div, "vol": vol, "e1": (ind.ema(c1, 9), ind.ema(c1, 21)),
+                         "e12": (ind.ema(c12, 9), ind.ema(c12, 21)), "ed": (ind.ema(cd, 20), ind.ema(cd, 50))}
+
+    def votes(self, c, T):
+        """{reading: vote} at the 4H close T, or None if this coin has no candle closing at T."""
+        d = self.d[c]
+        i = d["h4"].closes_at(T)
+        if i is None or i < 210 or not d["atr"][i]:
+            return None
+        e, px = d["e"], d["h4"].b[i]["c"]
+        out = {"structure": d["struct"][i],
+               "trend": 1 if px > max(e[100][i], e[200][i]) else -1 if px < min(e[100][i], e[200][i]) else 0,
+               "fast": self._state(e[9], e[21], i, slope=True),
+               "daily": self._state(*d["ed"], d["d1"].at(T)), "half-day": self._state(*d["e12"], d["h12"].at(T)),
+               "hourly": self._state(*d["e1"], d["h1"].at(T)), "volume": d["vol"][i], "RSI": d["div"][i]}
+        return {k: v for k, v in out.items() if not self.p["votes"] or k in self.p["votes"]}
+
+    def step(self, T, br, ctx):
+        cands = []
+        for c in self.d:
+            v = self.votes(c, T)
+            if v is None or c not in br.px:
+                continue
+            score = sum(v.values())
+            d = self.d[c]
+            i = d["h4"].closes_at(T)
+            a, px = d["atr"][i], d["h4"].b[i]["c"]
+            p = br.position(c)
+            if p:
+                br.tighten(c, px - p["side"] * self.p["trail_atr"] * a)
+                if score * p["side"] <= self.p["exit_score"]:
+                    br.close(c, T, f"the chart turned: score {score:+d}")
+                continue
+            if abs(score) >= self.p["need"]:
+                cands.append((-abs(score), c, score, a, px, v))
+        for _, c, score, a, px, v in sorted(cands):
+            if len(br.acct["positions"]) >= self.p["max_open"]:
+                break
+            side = 1 if score > 0 else -1
+            qty = br.equity() * self.p["gross"] / self.p["max_open"] / px
+            if self.p["risk_pct"]:
+                qty = min(qty, br.equity() * self.p["risk_pct"] / 100 / (self.p["stop_atr"] * a))
+            br.market(c, side, qty, T, stop=px - side * self.p["stop_atr"] * a, setup=f"confluence {score:+d}",
+                      note=", ".join(f"{k} {'up' if x > 0 else 'down'}" for k, x in v.items() if x), signal_t=T)
+
+
 # =========================================================================== regime + news
 class NewsRegime(Strategy):
     """News decides IF and which way; the market regime decides HOW.

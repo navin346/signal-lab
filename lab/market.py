@@ -49,7 +49,8 @@ def candles(coin, n, interval="1h", pause=0.5):
     j = _post({"type": "candleSnapshot", "req": {"coin": coin, "interval": interval,
                                                  "startTime": end - n * ms, "endTime": end - 1}})
     time.sleep(pause)                                        # stay well under the API weight limit
-    return [{"t": x["t"], "o": float(x["o"]), "h": float(x["h"]), "l": float(x["l"]), "c": float(x["c"])}
+    return [{"t": x["t"], "o": float(x["o"]), "h": float(x["h"]), "l": float(x["l"]), "c": float(x["c"]),
+             "v": float(x.get("v") or 0) * float(x["c"])}                    # dollar volume
             for x in j if x["t"] + ms <= end]
 
 
