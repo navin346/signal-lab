@@ -1,0 +1,65 @@
+strategy,asset,hyperliquid_market,side,setup,opened_utc,entry_price,stop_price,partial_target,target_price,mark_now,funding_usd_so_far,note
+coin_flip,GOLD,xyz:GOLD,short,,2026-11-20 03:10:09,3531.39,3602.02,,3460.77,3534.2,0.0466,
+coin_flip,OIL,xyz:CL,short,,2026-11-21 01:29:36,83.7522,85.4273,,82.0772,83.679,0.0336,
+coin_flip,NASDAQ,xyz:XYZ100,long,,2026-11-21 01:29:36,25345.1,24838.2,,25852,25320,-0.0096,
+buy_hold,GOLD,xyz:GOLD,long,,2026-11-20 03:10:09,3532.81,3462.15,,3603.46,3534.2,-0.038,
+buy_hold,OIL,xyz:CL,long,,2026-11-21 01:29:36,83.7858,82.11,,85.4615,83.679,-0.0263,
+buy_hold,NASDAQ,xyz:XYZ100,long,,2026-11-21 01:29:36,25345.1,24838.2,,25852,25320,-0.0075,
+rel_value,ENA,ENA,short,RV momentum,2026-11-06 00:00:00,0.160108,0.24021,,,0.094717,0.1611,score +0.0907
+rel_value,kPEPE,kPEPE,short,RV momentum,2026-11-16 00:00:00,0.00387423,0.0058125,,,0.003319,0.0353,score +0.2444
+rel_value,UNI,UNI,short,RV momentum,2026-11-17 00:00:00,5.16297,7.746,,,4.3914,0.0191,score +0.3017
+rel_value,AVAX,AVAX,short,RV momentum,2026-11-19 00:00:00,7.02659,10.542,,,6.3835,-0.0683,score +0.1914
+rel_value,ZEC,ZEC,short,RV momentum,2026-11-21 00:00:00,759.578,1139.6,,,743.32,0.0112,score +0.2062
+ta_trend,BTC,BTC,short,donchian 50/200 cross,2026-11-10 16:00:00,73175.4,59472.6,,,57961,0.2211,ADX 44
+ta_trend,BNB,BNB,short,donchian 50/200 cross,2026-11-12 12:00:00,663.937,542.383,,,525.69,0.1252,ADX 34
+ta_trend,ETH,ETH,short,donchian 50/200 cross,2026-11-13 04:00:00,1932.81,1666.89,,,1639.5,0.0096,ADX 55
+ta_trend,DOGE,DOGE,short,donchian 50/200 cross,2026-11-14 04:00:00,0.0624975,0.0552887,,,0.053228,-0.0118,ADX 48
+ta_trend,xyz:CL,xyz:CL,short,donchian 50/200 cross,2026-11-18 08:00:00,82.8144,84.3322,,,83.679,0.1155,ADX 23
+ta_trend,xyz:GOLD,xyz:GOLD,short,donchian 50/200 cross,2026-11-18 12:00:00,3765.55,3610.33,,,3534.2,0.1708,ADX 33
+ta_trend,xyz:XYZ100,xyz:XYZ100,short,donchian 50/200 cross,2026-11-20 12:00:00,26137.8,25967.3,,,25320,0.0377,ADX 25
+ta_trend,ZEC,ZEC,short,donchian 50/200 cross,2026-11-20 16:00:00,774.515,769.219,,,743.32,0.0117,ADX 28
+turbo,ENA,ENA,short,copy of rel_value: RV momentum,2026-11-06 00:00:00,0.160108,0.24021,,,0.094717,0.0422,learning (59/20 trades): copied at 1x
+turbo,BTC,BTC,short,copy of ta_trend: donchian 50/200 cross,2026-11-10 16:00:00,73175.4,59472.6,,,57961,0.0674,learning (28/20 trades): copied at 1x
+turbo,BNB,BNB,short,copy of ta_trend: donchian 50/200 cross,2026-11-12 12:00:00,663.937,542.383,,,525.69,0.0436,learning (30/20 trades): copied at 1x
+turbo,ETH,ETH,short,copy of ta_trend: donchian 50/200 cross,2026-11-13 04:00:00,1932.81,1666.89,,,1639.5,0.0035,learning (31/20 trades): copied at 1x
+turbo,DOGE,DOGE,short,copy of ta_trend: donchian 50/200 cross,2026-11-14 04:00:00,0.0624975,0.0552887,,,0.053228,-0.007,learning (34/20 trades): copied at 1x
+turbo,kPEPE,kPEPE,short,copy of rel_value: RV momentum,2026-11-16 00:00:00,0.00387423,0.0058125,,,0.003319,0.0158,learning (78/20 trades): copied at 1x
+turbo,UNI,UNI,short,copy of rel_value: RV momentum,2026-11-17 00:00:00,5.16297,7.746,,,4.3914,0.0085,learning (80/20 trades): copied at 1x
+turbo,hlc:ASTER,hlc:ASTER,long,copy of carry: carry leg (Hyperliquid),2026-11-18 00:00:00,0.585627,0.292755,,,0.48458,-0.0175,fixed 50% share
+turbo,ast:ASTERUSDT,ast:ASTERUSDT,short,copy of carry: carry leg (Aster),2026-11-18 00:00:00,0.586483,0.8799,,,0.485675,0.1275,fixed 50% share
+turbo,xyz:CL,xyz:CL,short,copy of ta_trend: donchian 50/200 cross,2026-11-18 08:00:00,82.8144,84.3322,,,83.679,0.0552,learning (38/20 trades): copied at 1x
+turbo,xyz:GOLD,xyz:GOLD,short,copy of ta_trend: donchian 50/200 cross,2026-11-18 12:00:00,3765.55,3610.33,,,3534.2,0.0848,learning (38/20 trades): copied at 1x
+turbo,AVAX,AVAX,short,copy of rel_value: RV momentum,2026-11-19 00:00:00,7.02659,10.542,,,6.3835,-0.0312,learning (83/20 trades): copied at 1x
+turbo,xyz:XYZ100,xyz:XYZ100,short,copy of ta_trend: donchian 50/200 cross,2026-11-20 12:00:00,26137.8,25967.3,,,25320,0.0319,learning (38/20 trades): copied at 1x
+turbo,ZEC,ZEC,short,copy of ta_trend: donchian 50/200 cross,2026-11-20 16:00:00,774.515,769.219,,,743.32,0.0095,learning (38/20 trades): copied at 1x
+turbo,hlc:INIT,hlc:INIT,short,copy of carry: carry leg (Hyperliquid),2026-11-21 00:00:00,0.0907388,0.136136,,,0.084215,-0.5043,fixed 50% share
+turbo,ast:INITUSDT,ast:INITUSDT,long,copy of carry: carry leg (Aster),2026-11-21 00:00:00,0.0905281,0.045255,,,0.0840358,0.406,fixed 50% share
+turbo,hlc:XMR,hlc:XMR,long,copy of carry: carry leg (Hyperliquid),2026-11-21 00:00:00,457.071,228.49,,,462.418,-0.0012,fixed 50% share
+turbo,ast:XMRUSDT,ast:XMRUSDT,short,copy of carry: carry leg (Aster),2026-11-21 00:00:00,457.528,686.43,,,462.742,0.0199,fixed 50% share
+carry,hlc:ASTER,hlc:ASTER,long,carry leg (Hyperliquid),2026-11-18 00:00:00,0.585627,0.292755,,,0.48458,-0.0395,7-day funding gap +75% a year (Aster minus Hyperliquid)
+carry,ast:ASTERUSDT,ast:ASTERUSDT,short,carry leg (Aster),2026-11-18 00:00:00,0.586483,0.8799,,,0.485675,0.2884,7-day funding gap +75% a year (Aster minus Hyperliquid)
+carry,hlc:INIT,hlc:INIT,short,carry leg (Hyperliquid),2026-11-21 00:00:00,0.0907388,0.136136,,,0.084215,-1.0233,7-day funding gap -314% a year (Aster minus Hyperliquid)
+carry,ast:INITUSDT,ast:INITUSDT,long,carry leg (Aster),2026-11-21 00:00:00,0.0905281,0.045255,,,0.0840358,0.8238,7-day funding gap -314% a year (Aster minus Hyperliquid)
+carry,hlc:XMR,hlc:XMR,long,carry leg (Hyperliquid),2026-11-21 00:00:00,457.071,228.49,,,462.418,-0.0025,7-day funding gap +23% a year (Aster minus Hyperliquid)
+carry,ast:XMRUSDT,ast:XMRUSDT,short,carry leg (Aster),2026-11-21 00:00:00,457.528,686.43,,,462.742,0.0404,7-day funding gap +23% a year (Aster minus Hyperliquid)
+trend_2x,BTC,BTC,short,donchian 50/200 cross,2026-11-10 16:00:00,73175.4,59472.6,,,57961,0.4937,ADX 44
+trend_2x,BNB,BNB,short,donchian 50/200 cross,2026-11-12 12:00:00,663.937,542.383,,,525.69,0.2762,ADX 34
+trend_2x,ETH,ETH,short,donchian 50/200 cross,2026-11-13 04:00:00,1932.81,1666.89,,,1639.5,0.0224,ADX 55
+trend_2x,DOGE,DOGE,short,donchian 50/200 cross,2026-11-14 04:00:00,0.0624975,0.0552887,,,0.053228,-0.0274,ADX 48
+trend_2x,xyz:CL,xyz:CL,short,donchian 50/200 cross,2026-11-18 08:00:00,82.8144,84.3322,,,83.679,0.2779,ADX 23
+trend_2x,xyz:GOLD,xyz:GOLD,short,donchian 50/200 cross,2026-11-18 12:00:00,3765.55,3610.33,,,3534.2,0.4116,ADX 33
+trend_2x,xyz:XYZ100,xyz:XYZ100,short,donchian 50/200 cross,2026-11-20 12:00:00,26137.8,25967.3,,,25320,0.0968,ADX 25
+trend_2x,ZEC,ZEC,short,donchian 50/200 cross,2026-11-20 16:00:00,774.515,769.219,,,743.32,0.0313,ADX 28
+confluence,ADA,ADA,short,confluence -4,2026-11-14 08:00:00,0.162647,0.149571,,,0.13965,-0.083,"trend down, fast down, daily down, half-day down"
+confluence,AVAX,AVAX,short,confluence -4,2026-11-14 08:00:00,7.9993,6.82702,,,6.3835,-0.0838,"trend down, fast down, daily down, half-day down"
+confluence,BNB,BNB,short,confluence -4,2026-11-14 08:00:00,615.607,554.544,,,525.69,0.0648,"trend down, fast down, daily down, half-day down"
+confluence,BTC,BTC,short,confluence -4,2026-11-14 08:00:00,67130.6,60855.4,,,57961,0.0843,"trend down, fast down, daily down, half-day down"
+confluence,DOGE,DOGE,short,confluence -4,2026-11-14 08:00:00,0.0625775,0.056896,,,0.053228,-0.0032,"trend down, fast down, daily down, half-day down"
+trend_pro,BTC,BTC,short,donchian 50/200 cross,2026-11-15 00:00:00,64109.2,59472.6,,,57961,0.2708,ADX 61
+trend_pro,ETH,ETH,short,donchian 50/200 cross,2026-11-15 00:00:00,1767.65,1666.89,,,1639.5,0.1009,ADX 58
+trend_pro,xyz:GOLD,xyz:GOLD,short,donchian 50/200 cross,2026-11-18 12:00:00,3765.55,3610.33,,,3534.2,0.4983,ADX 33
+trend_pro,xyz:XYZ100,xyz:XYZ100,short,donchian 50/200 cross,2026-11-20 12:00:00,26137.8,25967.3,,,25320,0.1163,ADX 25
+trend_pro,NEAR,NEAR,short,donchian 50/200 cross,2026-11-20 16:00:00,2.84513,2.91919,,,2.71962,0.0155,ADX 23
+trend_pro,ZEC,ZEC,short,donchian 50/200 cross,2026-11-20 16:00:00,774.515,769.219,,,743.32,0.0371,ADX 28
+trend_pro,SOL,SOL,short,donchian 50/200 cross,2026-11-21 04:00:00,66.2457,70.2829,,,68.087,-0.0608,ADX 32
+trend_pro,XMR,XMR,short,donchian 50/200 cross,2026-11-21 04:00:00,432.923,466.781,,,462.418,0.0156,ADX 37
