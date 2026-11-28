@@ -1,0 +1,37 @@
+strategy,asset,hyperliquid_market,side,setup,opened_utc,entry_price,stop_price,partial_target,target_price,mark_now,funding_usd_so_far,note
+coin_flip,GOLD,xyz:GOLD,long,,2026-11-28 01:56:49,3665.43,3592.12,,3738.74,3654.7,-0.0186,
+coin_flip,OIL,xyz:CL,short,,2026-11-28 01:56:49,83.3703,85.0377,,81.7029,82.977,0.0034,
+coin_flip,NASDAQ,xyz:XYZ100,long,,2026-11-28 01:56:49,26701.3,26167.3,,27235.4,26615,-0.0186,
+buy_hold,NASDAQ,xyz:XYZ100,long,,2026-11-26 04:59:46,26343.3,25816.4,,26870.1,26615,-0.0474,
+buy_hold,GOLD,xyz:GOLD,long,,2026-11-28 01:56:49,3665.43,3592.12,,3738.74,3654.7,-0.0146,
+buy_hold,OIL,xyz:CL,long,,2026-11-28 01:56:49,83.4037,81.7356,,85.0718,82.977,-0.0026,
+rel_value,ZEC,ZEC,short,RV momentum,2026-11-21 00:00:00,759.578,1139.6,,,722.63,0.1463,score +0.2062
+rel_value,AAVE,AAVE,short,RV momentum,2026-11-24 00:00:00,97.1586,145.767,,,92.215,0.0559,score +0.1096
+rel_value,WLFI,WLFI,short,RV momentum,2026-11-27 00:00:00,0.0422785,0.0634305,,,0.016948,-0.1185,score +0.0930
+rel_value,XMR,XMR,short,RV momentum,2026-11-27 00:00:00,458.098,687.285,,,431.54,-0.3101,score +0.0833
+rel_value,MNT,MNT,short,RV momentum,2026-11-28 00:00:00,0.368666,0.55311,,,0.39411,-0.2147,score +0.0192
+turbo,hlc:ASTER,hlc:ASTER,long,copy of carry: carry leg (Hyperliquid),2026-11-18 00:00:00,0.585627,0.292755,,,0.4913,-0.1033,fixed 50% share
+turbo,ast:ASTERUSDT,ast:ASTERUSDT,short,copy of carry: carry leg (Aster),2026-11-18 00:00:00,0.586483,0.8799,,,0.4922,0.2814,fixed 50% share
+turbo,AAVE,AAVE,short,copy of rel_value: RV momentum,2026-11-24 00:00:00,97.1586,145.767,,,92.215,0.0411,learning (92/20 trades): copied at 1x
+turbo,hlc:ATOM,hlc:ATOM,long,copy of carry: carry leg (Hyperliquid),2026-11-24 00:00:00,1.28186,0.6408,,,1.1852,-0.015,fixed 50% share
+turbo,ast:ATOMUSDT,ast:ATOMUSDT,short,copy of carry: carry leg (Aster),2026-11-24 00:00:00,1.28174,1.923,,,1.18484,0.0446,fixed 50% share
+turbo,WLFI,WLFI,short,copy of rel_value: RV momentum,2026-11-27 00:00:00,0.0422785,0.0634305,,,0.016948,-0.0886,learning (97/20 trades): copied at 1x
+turbo,XMR,XMR,short,copy of rel_value: RV momentum,2026-11-27 00:00:00,458.098,687.285,,,431.54,-0.2317,learning (97/20 trades): copied at 1x
+turbo,hlc:SAGA,hlc:SAGA,short,copy of carry: carry leg (Hyperliquid),2026-11-27 00:00:00,0.0146071,0.021915,,,0.01364,0.0368,fixed 50% share
+turbo,ast:SAGAUSDT,ast:SAGAUSDT,long,copy of carry: carry leg (Aster),2026-11-27 00:00:00,0.0145929,0.007295,,,0.0136259,-0.0351,fixed 50% share
+turbo,hlc:MOVE,hlc:MOVE,short,copy of carry: carry leg (Hyperliquid),2026-11-27 00:00:00,0.00563487,0.008454,,,0.00501,-2.6448,fixed 50% share
+turbo,ast:MOVEUSDT,ast:MOVEUSDT,long,copy of carry: carry leg (Aster),2026-11-27 00:00:00,0.00567113,0.002835,,,0.005025,2.3402,fixed 50% share
+turbo,MNT,MNT,short,copy of rel_value: RV momentum,2026-11-28 00:00:00,0.368666,0.55311,,,0.39411,-0.157,learning (97/20 trades): copied at 1x
+carry,hlc:ASTER,hlc:ASTER,long,carry leg (Hyperliquid),2026-11-18 00:00:00,0.585627,0.292755,,,0.4913,-0.2336,7-day funding gap +75% a year (Aster minus Hyperliquid)
+carry,ast:ASTERUSDT,ast:ASTERUSDT,short,carry leg (Aster),2026-11-18 00:00:00,0.586483,0.8799,,,0.4922,0.6364,7-day funding gap +75% a year (Aster minus Hyperliquid)
+carry,hlc:ATOM,hlc:ATOM,long,carry leg (Hyperliquid),2026-11-24 00:00:00,1.28186,0.6408,,,1.1852,-0.0317,7-day funding gap +21% a year (Aster minus Hyperliquid)
+carry,ast:ATOMUSDT,ast:ATOMUSDT,short,carry leg (Aster),2026-11-24 00:00:00,1.28174,1.923,,,1.18484,0.0943,7-day funding gap +21% a year (Aster minus Hyperliquid)
+carry,hlc:SAGA,hlc:SAGA,short,carry leg (Hyperliquid),2026-11-27 00:00:00,0.0146071,0.021915,,,0.01364,0.0813,7-day funding gap -192% a year (Aster minus Hyperliquid)
+carry,ast:SAGAUSDT,ast:SAGAUSDT,long,carry leg (Aster),2026-11-27 00:00:00,0.0145929,0.007295,,,0.0136259,-0.0775,7-day funding gap -192% a year (Aster minus Hyperliquid)
+carry,hlc:MOVE,hlc:MOVE,short,carry leg (Hyperliquid),2026-11-27 00:00:00,0.00563487,0.008454,,,0.00501,-5.8445,7-day funding gap -131% a year (Aster minus Hyperliquid)
+carry,ast:MOVEUSDT,ast:MOVEUSDT,long,carry leg (Aster),2026-11-27 00:00:00,0.00567113,0.002835,,,0.005025,5.1716,7-day funding gap -131% a year (Aster minus Hyperliquid)
+confluence,BNB,BNB,short,confluence -3,2026-11-23 16:00:00,569.036,568.411,,,552.25,0.0525,"trend down, daily down, half-day down"
+confluence,ZEC,ZEC,short,confluence -3,2026-11-23 16:00:00,859.848,794.234,,,722.63,0.0538,"trend down, daily down, half-day down"
+confluence,ADA,ADA,short,confluence -3,2026-11-26 04:00:00,0.14856,0.155077,,,0.14497,-0.0567,"trend down, daily down, half-day down"
+confluence,AVAX,AVAX,short,confluence -3,2026-11-26 04:00:00,6.67386,6.86091,,,6.4406,-0.0518,"trend down, daily down, half-day down"
+confluence,BTC,BTC,short,confluence -3,2026-11-27 16:00:00,60077,62382.4,,,59467,0.007,"trend down, daily down, half-day down"
